@@ -6,7 +6,7 @@ using System;
 using System.Net;
 using System.Threading;
 
-namespace Sample
+namespace Zhaobang.FtpServer
 {
     /// <summary>
     /// The main program
@@ -76,7 +76,7 @@ namespace Sample
                 baseDir = Console.ReadLine();
             }
 
-            var server = new Zhaobang.FtpServer.FtpServer(ep, baseDir);
+            var server = new FtpServer(ep, baseDir);
 
             var cancelSource = new CancellationTokenSource();
             var runResult = server.RunAsync(cancelSource.Token);
