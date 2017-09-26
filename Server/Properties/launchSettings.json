@@ -1,8 +1,7 @@
 {
   "profiles": {
     "Sample": {
-      "commandName": "Project",
-      "commandLineArgs": "-d C:\\Users\\Zhaoquan\\Desktop\\XSCORE"
+      "commandName": "Project"
     }
   }
 }

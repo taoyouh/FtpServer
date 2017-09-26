@@ -2,6 +2,14 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.4</TargetFramework>
+    <PackageId>Zhaobang.FtpServer</PackageId>
+    <Authors>Zhaoquan Huang</Authors>
+    <Product>Ftp Server Library</Product>
+    <Description>A package for hosting an FTP server, with authenticating and file managing customizable</Description>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Company>Zhaobang China</Company>
+    <PackageProjectUrl>https://github.com/ZhaobangChina/FtpServer</PackageProjectUrl>
+    <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
