@@ -13,9 +13,9 @@ using System.Threading.Tasks;
 namespace Zhaobang.FtpServer.Connections
 {
     /// <summary>
-    /// The maintainer of FTP data connection for ONE user
+    /// Establish data connection from local sever
     /// </summary>
-    public class DataConnection : IDisposable
+    public class LocalDataConnection : IDisposable, IDataConnection
     {
         private static LinkedList<int> availablePorts = new LinkedList<int>();
 
@@ -31,12 +31,12 @@ namespace Zhaobang.FtpServer.Connections
         private TcpListener tcpListener;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DataConnection"/> class.
+        /// Initializes a new instance of the <see cref="LocalDataConnection"/> class.
         /// The class is used to maintain FTP data connection for ONE user.
         /// NO connection will be initiated immediately.
         /// </summary>
         /// <param name="localIP">The IP which was connected by the user</param>
-        public DataConnection(IPAddress localIP)
+        public LocalDataConnection(IPAddress localIP)
         {
             listeningIP = localIP;
         }
@@ -44,7 +44,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <summary>
         /// Gets a value indicating whether a data connection is open
         /// </summary>
-        public virtual bool IsOpen
+        public bool IsOpen
         {
             get { return TcpClient != null && TcpClient.Connected; }
         }
@@ -79,7 +79,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <param name="remoteIP">The IP to connect to</param>
         /// <param name="remotePort">The port to connect to</param>
         /// <returns>The task to await</returns>
-        public virtual async Task ConnectActiveAsync(IPAddress remoteIP, int remotePort)
+        public async Task ConnectActiveAsync(IPAddress remoteIP, int remotePort)
         {
             listeningPort = -1;
             TcpClient = new TcpClient();
@@ -90,7 +90,7 @@ namespace Zhaobang.FtpServer.Connections
         /// Listens for FTP passive connection and returns the listening end point
         /// </summary>
         /// <returns>The end point listening at</returns>
-        public virtual IPEndPoint Listen()
+        public IPEndPoint Listen()
         {
             if (tcpListener != null)
             {
@@ -132,7 +132,7 @@ namespace Zhaobang.FtpServer.Connections
         /// Accepts a FTP passive mode connection
         /// </summary>
         /// <returns>The task to await</returns>
-        public virtual async Task AcceptAsync()
+        public async Task AcceptAsync()
         {
             tcpClient = await tcpListener.AcceptTcpClientAsync();
             tcpListener.Stop();
@@ -144,7 +144,7 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <returns>The task to await</returns>
 #pragma warning disable CS1998
-        public virtual async Task DisconnectAsync()
+        public async Task DisconnectAsync()
 #pragma warning restore CS1998
         {
             TcpClient = null;
@@ -155,7 +155,7 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="streamToRead">The stream to copy from</param>
         /// <returns>The task to await</returns>
-        public virtual async Task SendAsync(Stream streamToRead)
+        public async Task SendAsync(Stream streamToRead)
         {
             var stream = tcpClient.GetStream();
             await streamToRead.CopyToAsync(stream);
@@ -167,16 +167,16 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="streamToWrite">The stream to copy to</param>
         /// <returns>The task to await</returns>
-        public virtual async Task RecieveAsync(Stream streamToWrite)
+        public async Task RecieveAsync(Stream streamToWrite)
         {
             var stream = tcpClient.GetStream();
             await stream.CopyToAsync(streamToWrite);
         }
 
         /// <summary>
-        /// Dispose of the connection and listener
+        /// Close the connection and listener
         /// </summary>
-        public void Dispose()
+        public void Close()
         {
             if (TcpClient != null)
             {
@@ -190,6 +190,14 @@ namespace Zhaobang.FtpServer.Connections
                     availablePorts.AddLast(listeningPort);
                 }
             }
+        }
+
+        /// <summary>
+        /// Dispose of the connection and listener
+        /// </summary>
+        public void Dispose()
+        {
+            Close();
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿// <copyright file="DataConnector.cs" company="Zhaoquan Huang">
+﻿// <copyright file="DataConnectionFactory.cs" company="Zhaoquan Huang">
 // Copyright (c) Zhaoquan Huang. All rights reserved
 // </copyright>
 
@@ -12,18 +12,19 @@ using System.Threading.Tasks;
 namespace Zhaobang.FtpServer.Connections
 {
     /// <summary>
-    /// Manager to provide <see cref="DataConnection"/> for each user
+    /// Manager to provide <see cref="LocalDataConnection"/> for each user.
+    /// Data connections are established from local server
     /// </summary>
-    public class DataConnector
+    public class LocalDataConnectionFactory : IDataConnectionFactory
     {
         /// <summary>
-        /// Gets <see cref="DataConnection"/> for a user
+        /// Gets <see cref="LocalDataConnection"/> for a user
         /// </summary>
         /// <param name="localIP">The IP which was connected by the user</param>
         /// <returns>The data connection for the user</returns>
-        public virtual DataConnection GetDataConnection(IPAddress localIP)
+        public IDataConnection GetDataConnection(IPAddress localIP)
         {
-            return new DataConnection(localIP);
+            return new LocalDataConnection(localIP);
         }
     }
 }

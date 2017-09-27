@@ -10,11 +10,19 @@
     <Company>Zhaobang China</Company>
     <PackageProjectUrl>https://github.com/ZhaobangChina/FtpServer</PackageProjectUrl>
     <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
+    <Version>2.0.0</Version>
+    <RootNamespace>Zhaobang.FtpServer</RootNamespace>
+    <AssemblyName>Zhaobang.FtpServer</AssemblyName>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netstandard1.4\FtpServer.xml</DocumentationFile>
-    <CodeAnalysisRuleSet>stylecop.ruleset</CodeAnalysisRuleSet>
+    <DocumentationFile>bin\Debug\netstandard1.4\Zhaobang.FtpServer.xml</DocumentationFile>
+    <NoWarn>1701;1702;1705;SA1101;SA1501;SA1503;SA1512;SA1513</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <NoWarn>1701;1702;1705;SA1101;SA1501;SA1503;SA1512;SA1513</NoWarn>
+    <DocumentationFile>bin\Release\netstandard1.4\Zhaobang.FtpServer.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,10 +31,6 @@
 
   <ItemGroup>
     <AdditionalFiles Include="stylecop.json" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="StyleCop.Analyzers" Version="1.0.2" />
   </ItemGroup>
 
 </Project>

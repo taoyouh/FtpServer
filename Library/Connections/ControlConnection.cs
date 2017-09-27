@@ -34,9 +34,9 @@ namespace Zhaobang.FtpServer.Connections
 
         /// <summary>
         /// This should be available all time, but needs to check
-        /// <see cref="DataConnection.IsOpen"/> before usage.
+        /// <see cref="LocalDataConnection.IsOpen"/> before usage.
         /// </summary>
-        private readonly DataConnection dataConnection;
+        private readonly IDataConnection dataConnection;
 
         private Encoding encoding = Encoding.UTF8;
         private string userName = string.Empty;
@@ -54,7 +54,7 @@ namespace Zhaobang.FtpServer.Connections
         /// This is relevant to user, and should be available if
         /// and only if <see cref="authenticated"/> is true.
         /// </summary>
-        private FileProvider fileProvider;
+        private IFileProvider fileProvider;
 
         /// <summary>
         /// Only stream mode is supported
@@ -149,7 +149,7 @@ namespace Zhaobang.FtpServer.Connections
         public void Dispose()
         {
             tcpClient.Dispose();
-            dataConnection.Dispose();
+            dataConnection.Close();
         }
 
         /// <summary>
@@ -393,39 +393,27 @@ namespace Zhaobang.FtpServer.Connections
             {
                 if (listFormat == ListFormat.Unix)
                 {
-                    if (item is FileInfo file)
-                    {
-                        await writer.WriteLineAsync(
-                            string.Format(
-                                "-{0}{0}{0}   1 owner   group {1,15} {2} {3}",
-                                file.IsReadOnly ? "r-x" : "rwx",
-                                file.Length,
-                                item.LastWriteTime.ToString(
+                    await writer.WriteLineAsync(
+                        string.Format(
+                            "{0}{1}{1}{1}   1 owner   group {2,15} {3} {4}",
+                            item.IsDirectory ? 'd' : '-',
+                            item.IsReadOnly ? "r-x" : "rwx",
+                            item.Length,
+                            item.LastWriteTime.ToString(
                                 item.LastWriteTime.Year == DateTime.Now.Year ?
-                                    "MMM dd HH:mm" : "MMM dd  yyyy", CultureInfo.InvariantCulture),
-                                item.Name));
-                    }
-                    else
-                    {
-                        await writer.WriteLineAsync(
-                            string.Format(
-                                "drwxrwxrwx   1 owner   group               0 {0} {1}",
-                                item.LastWriteTime.ToString(
-                                item.LastWriteTime.Year == DateTime.Now.Year ?
-                                    "MMM dd HH:mm" : "MMM dd  yyyy", CultureInfo.InvariantCulture),
-                                item.Name));
-                    }
+                                "MMM dd HH:mm" : "MMM dd  yyyy", CultureInfo.InvariantCulture),
+                            item.Name));
                 }
                 else if (listFormat == ListFormat.MsDos)
                 {
-                    if (item is FileInfo file)
+                    if (item.IsDirectory)
                     {
                         await writer.WriteLineAsync(
                             string.Format(
                                 CultureInfo.InvariantCulture,
                                 "{0:MM-dd-yy  hh:mmtt} {1,20} {2}",
                                 item.LastWriteTime,
-                                file.Length,
+                                item.Length,
                                 item.Name));
                     }
                     else
@@ -497,7 +485,7 @@ namespace Zhaobang.FtpServer.Connections
                 return;
             }
 
-            using (Stream fileStream = await fileProvider.OpenFileForWriteAsync(parameter))
+            using (Stream fileStream = await fileProvider.CreateFileForWriteAsync(parameter))
             {
                 await OpenDataConnectionAsync();
                 await dataConnection.RecieveAsync(fileStream);

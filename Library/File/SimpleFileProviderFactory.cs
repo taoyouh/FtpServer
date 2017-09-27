@@ -1,4 +1,4 @@
-﻿// <copyright file="FileManager.cs" company="Zhaoquan Huang">
+﻿// <copyright file="SimpleFileProviderFactory.cs" company="Zhaoquan Huang">
 // Copyright (c) Zhaoquan Huang. All rights reserved
 // </copyright>
 
@@ -10,18 +10,19 @@ using System.Text;
 namespace Zhaobang.FtpServer.File
 {
     /// <summary>
-    /// Manager that provides <see cref="FileProvider"/> for each user
+    /// Manager that provides <see cref="SimpleFileProvider"/> for each user.
+    /// The provider shares a root directory accross all users.
     /// </summary>
-    public class FileManager
+    public class SimpleFileProviderFactory : IFileProviderFactory
     {
         private string baseDirectory;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="FileManager"/> class.
+        /// Initializes a new instance of the <see cref="SimpleFileProviderFactory"/> class.
         /// Every user shares the same root directory.
         /// </summary>
         /// <param name="baseDirectory">The root directory of FTP</param>
-        public FileManager(string baseDirectory)
+        public SimpleFileProviderFactory(string baseDirectory)
         {
             if (!Directory.Exists(baseDirectory))
             {
@@ -34,10 +35,10 @@ namespace Zhaobang.FtpServer.File
         /// Gets provider for the specified user
         /// </summary>
         /// <param name="user">The name of the user</param>
-        /// <returns>The <see cref="FileProvider"/> for that user</returns>
-        public virtual FileProvider GetProvider(string user)
+        /// <returns>The <see cref="SimpleFileProvider"/> for that user</returns>
+        public IFileProvider GetProvider(string user)
         {
-            return new FileProvider(baseDirectory);
+            return new SimpleFileProvider(baseDirectory);
         }
     }
 }

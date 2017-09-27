@@ -11,6 +11,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Zhaobang.FtpServer.Authenticate;
 using Zhaobang.FtpServer.Connections;
 using Zhaobang.FtpServer.File;
 
@@ -21,17 +22,17 @@ namespace Zhaobang.FtpServer
     /// </summary>
     public sealed class FtpServer
     {
-        private DataConnector dataConnector;
-        private FtpAuthenticator authenticator;
-        private FileManager fileManager;
+        private IDataConnectionFactory dataConnFactory;
+        private IAuthenticator authenticator;
+        private IFileProviderFactory fileProviderFactory;
 
         private IPEndPoint endPoint;
         private TcpListener tcpListener;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="FtpServer"/> class.
-        /// The server uses a default authenticator that says yes all the time,
-        /// and provide file from a base directory to every users.
+        /// Initializes a new instance of the <see cref="FtpServer"/> class
+        /// with <see cref="SimpleFileProviderFactory"/>, <see cref="LocalDataConnectionFactory"/>,
+        /// and <see cref="AnonymousAuthenticator"/>.
         /// </summary>
         /// <param name="endPoint">The local end point to listen, usually 0.0.0.0:21</param>
         /// <param name="baseDirectory">The directory to provide files</param>
@@ -40,9 +41,9 @@ namespace Zhaobang.FtpServer
             this.endPoint = endPoint;
             tcpListener = new TcpListener(endPoint);
 
-            fileManager = new FileManager(baseDirectory);
-            dataConnector = new DataConnector();
-            authenticator = new FtpAuthenticator();
+            fileProviderFactory = new SimpleFileProviderFactory(baseDirectory);
+            dataConnFactory = new LocalDataConnectionFactory();
+            authenticator = new AnonymousAuthenticator();
         }
 
         /// <summary>
@@ -50,37 +51,37 @@ namespace Zhaobang.FtpServer
         /// The server uses custom file, data connection, and authentication provider.
         /// </summary>
         /// <param name="endPoint">The local end point to listen, usually 0.0.0.0:21</param>
-        /// <param name="fileManager">The <see cref="File.FileManager"/> to use</param>
-        /// <param name="dataConnector">The <see cref="Connections.DataConnector"/> to use</param>
-        /// <param name="authenticator">The <see cref="FtpAuthenticator"/> to use</param>
+        /// <param name="fileProviderFactory">The <see cref="IFileProviderFactory"/> to use</param>
+        /// <param name="dataConnFactory">The <see cref="IDataConnectionFactory"/> to use</param>
+        /// <param name="authenticator">The <see cref="IAuthenticator"/> to use</param>
         public FtpServer(
             IPEndPoint endPoint,
-            FileManager fileManager,
-            DataConnector dataConnector,
-            FtpAuthenticator authenticator)
+            IFileProviderFactory fileProviderFactory,
+            IDataConnectionFactory dataConnFactory,
+            IAuthenticator authenticator)
         {
             this.endPoint = endPoint;
             tcpListener = new TcpListener(endPoint);
 
-            this.fileManager = fileManager;
-            this.dataConnector = dataConnector;
+            this.fileProviderFactory = fileProviderFactory;
+            this.dataConnFactory = dataConnFactory;
             this.authenticator = authenticator;
         }
 
         /// <summary>
-        /// Gets the manager that provides <see cref="DataConnection"/> for each user
+        /// Gets the manager that provides <see cref="IDataConnectionFactory"/> for each user
         /// </summary>
-        internal DataConnector DataConnector { get => dataConnector; }
+        internal IDataConnectionFactory DataConnector { get => dataConnFactory; }
 
         /// <summary>
         /// Gets the manager that authenticates user
         /// </summary>
-        internal FtpAuthenticator Authenticator { get => authenticator; }
+        internal IAuthenticator Authenticator { get => authenticator; }
 
         /// <summary>
-        /// Gets the manager that provides <see cref="FileProvider"/> for each user
+        /// Gets the manager that provides <see cref="IFileProviderFactory"/> for each user
         /// </summary>
-        internal FileManager FileManager { get => fileManager; }
+        internal IFileProviderFactory FileManager { get => fileProviderFactory; }
 
         /// <summary>
         /// Start the FTP server
