@@ -6,13 +6,17 @@
     <Authors>Zhaoquan Huang</Authors>
     <Product>Ftp Server Library</Product>
     <Description>A package for hosting an FTP server, with authenticating and file managing customizable</Description>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <Company>Zhaobang China</Company>
     <PackageProjectUrl>https://github.com/ZhaobangChina/FtpServer</PackageProjectUrl>
     <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
-    <Version>2.0.0</Version>
+    <Version>2.0.0-alpha</Version>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <AssemblyName>Zhaobang.FtpServer</AssemblyName>
+    <PackageLicenseUrl>https://github.com/ZhaobangChina/FtpServer/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageReleaseNotes>Changed the classes for customization. Basic use is just as before</PackageReleaseNotes>
+    <PackageTags>FTP</PackageTags>
+    <NeutralLanguage>en-US</NeutralLanguage>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
