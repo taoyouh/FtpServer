@@ -80,6 +80,8 @@ namespace Zhaobang.FtpServer.File
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The file stream</returns>
+        /// <exception cref="FileSpaceInsufficientException"/>
+        /// <exception cref="FileBusyException"/>
         Task<Stream> CreateFileForWriteAsync(string path);
 
         /// <summary>

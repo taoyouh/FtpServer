@@ -513,12 +513,26 @@ namespace Zhaobang.FtpServer.Connections
                 return;
             }
 
-            using (Stream fileStream = await fileProvider.CreateFileForWriteAsync(parameter))
+            try
             {
-                await OpenDataConnectionAsync();
-                await dataConnection.RecieveAsync(fileStream);
-                await fileStream.FlushAsync();
+                using (Stream fileStream = await fileProvider.CreateFileForWriteAsync(parameter))
+                {
+                    await OpenDataConnectionAsync();
+                    await dataConnection.RecieveAsync(fileStream);
+                    await fileStream.FlushAsync();
+                }
             }
+            catch (FileBusyException ex)
+            {
+                await ReplyAsync(FtpReplyCode.FileBusy, string.Format("Temporarily unavailable: {0}", ex.Message));
+                return;
+            }
+            catch (FileSpaceInsufficientException ex)
+            {
+                await ReplyAsync(FtpReplyCode.FileSpaceInsufficient, string.Format("Writing file denied: {0}", ex.Message));
+                return;
+            }
+
             await dataConnection.DisconnectAsync();
             await ReplyAsync(FtpReplyCode.SuccessClosingDataConnection, "File has been recieved");
             return;

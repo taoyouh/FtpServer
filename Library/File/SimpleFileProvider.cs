@@ -184,12 +184,29 @@ namespace Zhaobang.FtpServer.File
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The file stream</returns>
+        /// <exception cref="FileSpaceInsufficientException"/>
+        /// <exception cref="FileBusyException"/>
 #pragma warning disable CS1998
         public async Task<Stream> CreateFileForWriteAsync(string path)
 #pragma warning restore CS1998
         {
-            string localPath = GetLocalPath(path);
-            return System.IO.File.Create(localPath);
+            try
+            {
+                string localPath = GetLocalPath(path);
+                return System.IO.File.Create(localPath);
+            }
+            catch(Exception ex)
+            {
+                if (ex is ArgumentException ||
+                    ex is ArgumentNullException ||
+                    ex is UnauthorizedAccessException ||
+                    ex is PathTooLongException ||
+                    ex is DirectoryNotFoundException ||
+                    ex is NotSupportedException)
+                    throw new FileSpaceInsufficientException(ex.Message, ex);
+                else
+                    throw new FileBusyException(ex.Message);
+            }
         }
 
         /// <summary>

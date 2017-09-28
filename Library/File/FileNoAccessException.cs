@@ -9,7 +9,7 @@ namespace Zhaobang.FtpServer.File
     /// success when retrying (e.g., file not found or unauthorized access).
     /// Causing FTP reply code 550
     /// </summary>
-    class FileNoAccessException : Exception
+    public class FileNoAccessException : Exception
     {
         /// <summary>
         /// Initiates a <see cref="FileNoAccessException"/>.
