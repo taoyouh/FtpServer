@@ -88,7 +88,8 @@ namespace Zhaobang.FtpServer.File
         Task<IEnumerable<string>> GetNameListingAsync(string path);
 
         /// <summary>
-        /// Gets the info of files and directories
+        /// If the path is a directory, gets the info of its contents.
+        /// If the path is a file, gets its info.
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The info of items in <see cref="FileInfo"/> or <see cref="DirectoryInfo"/></returns>

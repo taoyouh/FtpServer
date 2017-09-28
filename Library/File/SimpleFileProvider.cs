@@ -180,7 +180,8 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Gets the info of files and directories
+        /// If the path is a directory, gets the info of its contents.
+        /// If the path is a file, gets its info.
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The info of items in <see cref="FileInfo"/> or <see cref="DirectoryInfo"/></returns>
@@ -189,6 +190,19 @@ namespace Zhaobang.FtpServer.File
 #pragma warning restore CS1998
         {
             string localPath = GetLocalPath(path);
+            try
+            {
+                FileInfo fileInfo = new FileInfo(localPath);
+                return new[] {new FileSystemEntry
+                {
+                    Name=fileInfo.Name,
+                    IsDirectory=false,
+                    Length=fileInfo.Length,
+                    IsReadOnly=fileInfo.IsReadOnly,
+                    LastWriteTime=fileInfo.LastWriteTime
+                } };
+            }
+            catch (FileNotFoundException) { }
             var directories = Directory.GetDirectories(localPath)
                 .Select(x => new DirectoryInfo(x))
                 .Select(x => new FileSystemEntry
