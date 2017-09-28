@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -57,13 +58,20 @@ namespace Zhaobang.FtpServer.File
         /// <returns>Whether the setting succeeded or not</returns>
         public bool SetWorkingDirectory(string path)
         {
-            var localPath = GetLocalPath(path);
-            if (Directory.Exists(localPath))
+            try
             {
-                workingDirectory = GetFtpPath(localPath);
-                return true;
+                var localPath = GetLocalPath(path);
+                if (Directory.Exists(localPath))
+                {
+                    workingDirectory = GetFtpPath(localPath);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
-            else
+            catch (UnauthorizedAccessException)
             {
                 return false;
             }
@@ -130,12 +138,30 @@ namespace Zhaobang.FtpServer.File
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The file stream</returns>
+        /// <exception cref="FileBusyException"/>
+        /// <exception cref="FileNoAccessException"/>
 #pragma warning disable CS1998
         public async Task<Stream> OpenFileForReadAsync(string path)
 #pragma warning restore CS1998
         {
-            string localPath = GetLocalPath(path);
-            return System.IO.File.OpenRead(localPath);
+            try
+            {
+                string localPath = GetLocalPath(path);
+                return System.IO.File.OpenRead(localPath);
+            }
+            catch(Exception ex)
+            {
+                if (ex is ArgumentException ||
+                    ex is ArgumentNullException ||
+                    ex is UnauthorizedAccessException ||
+                    ex is PathTooLongException ||
+                    ex is DirectoryNotFoundException ||
+                    ex is FileNotFoundException ||
+                    ex is NotSupportedException)
+                    throw new FileNoAccessException(ex.Message, ex);
+                else
+                    throw new FileBusyException(ex.Message);
+            }
         }
 
         /// <summary>
@@ -171,12 +197,30 @@ namespace Zhaobang.FtpServer.File
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The names of items</returns>
+        /// <exception cref="FileBusyException"/>
+        /// <exception cref="FileNoAccessException"/>
 #pragma warning disable CS1998
         public async Task<IEnumerable<string>> GetNameListingAsync(string path)
 #pragma warning restore CS1998
         {
-            string localPath = GetLocalPath(path);
-            return Directory.EnumerateFileSystemEntries(localPath);
+            try
+            {
+                string localPath = GetLocalPath(path);
+                return Directory.EnumerateFileSystemEntries(localPath);
+            }
+            catch (Exception ex)
+            {
+                if (ex is ArgumentException ||
+                    ex is ArgumentNullException ||
+                    ex is PathTooLongException ||
+                    ex is UnauthorizedAccessException ||
+                    ex is SecurityException ||
+                    ex is DirectoryNotFoundException ||
+                    ex is IOException)
+                    throw new FileNoAccessException(ex.Message, ex);
+                else
+                    throw new FileBusyException(ex.Message, ex);
+            }
         }
 
         /// <summary>
@@ -185,47 +229,70 @@ namespace Zhaobang.FtpServer.File
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The info of items in <see cref="FileInfo"/> or <see cref="DirectoryInfo"/></returns>
+        /// <exception cref="FileBusyException"/>
+        /// <exception cref="FileNoAccessException"/>
 #pragma warning disable CS1998
         public async Task<IEnumerable<FileSystemEntry>> GetListingAsync(string path)
 #pragma warning restore CS1998
         {
-            string localPath = GetLocalPath(path);
             try
             {
-                FileInfo fileInfo = new FileInfo(localPath);
-                return new[] {new FileSystemEntry
+                string localPath = GetLocalPath(path);
+                try
                 {
-                    Name=fileInfo.Name,
-                    IsDirectory=false,
-                    Length=fileInfo.Length,
-                    IsReadOnly=fileInfo.IsReadOnly,
-                    LastWriteTime=fileInfo.LastWriteTime
-                } };
+                    FileInfo fileInfo = new FileInfo(localPath);
+                    return new[] {new FileSystemEntry
+                    {
+                        Name=fileInfo.Name,
+                        IsDirectory=false,
+                        Length=fileInfo.Length,
+                        IsReadOnly=fileInfo.IsReadOnly,
+                        LastWriteTime=fileInfo.LastWriteTime
+                    } };
+                }
+                catch (FileNotFoundException) { }
+                var directories = Directory.GetDirectories(localPath)
+                    .Select(x => new DirectoryInfo(x))
+                    .Select(x => new FileSystemEntry
+                    {
+                        Name = x.Name,
+                        IsDirectory = true,
+                        Length = 0,
+                        IsReadOnly = false,
+                        LastWriteTime = x.LastWriteTime
+                    });
+                var files = Directory.GetFiles(localPath)
+                    .Select(x => new FileInfo(x))
+                    .Select(x => new FileSystemEntry
+                    {
+                        Name = x.Name,
+                        IsDirectory = false,
+                        Length = x.Length,
+                        IsReadOnly = x.IsReadOnly,
+                        LastWriteTime = x.LastWriteTime
+                    });
+                return directories.Concat<FileSystemEntry>(files);
             }
-            catch (FileNotFoundException) { }
-            var directories = Directory.GetDirectories(localPath)
-                .Select(x => new DirectoryInfo(x))
-                .Select(x => new FileSystemEntry
-                {
-                    Name = x.Name,
-                    IsDirectory = true,
-                    Length = 0,
-                    IsReadOnly = false,
-                    LastWriteTime = x.LastWriteTime
-                });
-            var files = Directory.GetFiles(localPath)
-                .Select(x => new FileInfo(x))
-                .Select(x => new FileSystemEntry
-                {
-                    Name = x.Name,
-                    IsDirectory = false,
-                    Length = x.Length,
-                    IsReadOnly = x.IsReadOnly,
-                    LastWriteTime = x.LastWriteTime
-                });
-            return directories.Concat<FileSystemEntry>(files);
+            catch (Exception ex)
+            {
+                if (ex is ArgumentException ||
+                    ex is ArgumentNullException ||
+                    ex is PathTooLongException ||
+                    ex is UnauthorizedAccessException ||
+                    ex is SecurityException ||
+                    ex is DirectoryNotFoundException)
+                    throw new FileNoAccessException(ex.Message, ex);
+                else
+                    throw new FileBusyException(ex.Message, ex);
+            }
         }
 
+        /// <exception cref="ArgumentException"/>
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="UnauthorizedAccessException"/>
+        /// <exception cref="SecurityException"/>
+        /// <exception cref="NotSupportedException"/>
+        /// <exception cref="PathTooLongException"/>
         private string GetLocalPath(string path)
         {
             string fullPath = Path.Combine(workingDirectory, path).TrimStart('/', '\\');

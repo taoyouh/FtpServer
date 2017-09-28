@@ -62,6 +62,8 @@ namespace Zhaobang.FtpServer.File
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The file stream</returns>
+        /// <exception cref="FileBusyException"/>
+        /// <exception cref="FileNoAccessException"/>
         Task<Stream> OpenFileForReadAsync(string path);
 
         /// <summary>
@@ -85,6 +87,8 @@ namespace Zhaobang.FtpServer.File
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The names of items</returns>
+        /// <exception cref="FileBusyException"/>
+        /// <exception cref="FileNoAccessException"/>
         Task<IEnumerable<string>> GetNameListingAsync(string path);
 
         /// <summary>
@@ -93,6 +97,8 @@ namespace Zhaobang.FtpServer.File
         /// </summary>
         /// <param name="path">Absolute or relative FTP path of the file</param>
         /// <returns>The info of items in <see cref="FileInfo"/> or <see cref="DirectoryInfo"/></returns>
+        /// <exception cref="FileBusyException"/>
+        /// <exception cref="FileNoAccessException"/>
         Task<IEnumerable<FileSystemEntry>> GetListingAsync(string path);
     }
 }
