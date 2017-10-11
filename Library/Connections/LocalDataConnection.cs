@@ -78,11 +78,12 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="remoteIP">The IP to connect to</param>
         /// <param name="remotePort">The port to connect to</param>
+        /// <param name="addressFamily">The address family of connection</param>
         /// <returns>The task to await</returns>
-        public async Task ConnectActiveAsync(IPAddress remoteIP, int remotePort)
+        public async Task ConnectActiveAsync(IPAddress remoteIP, int remotePort, AddressFamily addressFamily)
         {
             listeningPort = -1;
-            TcpClient = new TcpClient();
+            TcpClient = new TcpClient(addressFamily);
             await TcpClient.ConnectAsync(remoteIP, remotePort);
         }
 
@@ -119,6 +120,48 @@ namespace Zhaobang.FtpServer.Connections
                     tcpListener = new TcpListener(listeningEP);
                     tcpListener.Start();
                     return listeningEP;
+                }
+                catch
+                {
+                    port++;
+                }
+            }
+            throw new Exception("There are no ports available");
+        }
+
+        /// <summary>
+        /// Listens for FTP EPSV connection and returns the listening port
+        /// </summary>
+        /// <returns>The port listening at</returns>
+        public int ExtendedListen()
+        {
+            if (tcpListener != null)
+            {
+                try
+                {
+                    tcpListener.Start();
+                    return listeningPort;
+                }
+                catch { }
+            }
+            int port = 1050;
+            lock (availablePorts)
+            {
+                if (availablePorts.First != null)
+                {
+                    port = availablePorts.First.Value;
+                    availablePorts.RemoveFirst();
+                }
+            }
+            while (port < 65536)
+            {
+                try
+                {
+                    listeningPort = port;
+                    var listeningEP = new IPEndPoint(listeningIP, listeningPort);
+                    tcpListener = new TcpListener(listeningEP);
+                    tcpListener.Start();
+                    return listeningEP.Port;
                 }
                 catch
                 {

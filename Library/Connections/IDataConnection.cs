@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -27,14 +28,21 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="remoteIP">The IP to connect to</param>
         /// <param name="remotePort">The port to connect to</param>
+        /// <param name="addressFamily">The address family of connection</param>
         /// <returns>The task to await</returns>
-        Task ConnectActiveAsync(IPAddress remoteIP, int remotePort);
+        Task ConnectActiveAsync(IPAddress remoteIP, int remotePort, AddressFamily addressFamily);
 
         /// <summary>
         /// Listens for FTP passive connection and returns the listening end point
         /// </summary>
         /// <returns>The end point listening at</returns>
         IPEndPoint Listen();
+
+        /// <summary>
+        /// Listens for FTP EPSV connection and returns the listening port
+        /// </summary>
+        /// <returns>The port listening at</returns>
+        int ExtendedListen();
 
         /// <summary>
         /// Accepts a FTP passive mode connection

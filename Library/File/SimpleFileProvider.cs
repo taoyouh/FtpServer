@@ -313,11 +313,8 @@ namespace Zhaobang.FtpServer.File
         private string GetLocalPath(string path)
         {
             string fullPath = Path.Combine(workingDirectory, path).TrimStart('/', '\\');
-            Console.WriteLine("full path: {0}", fullPath);
             string localPath = Path.GetFullPath(Path.Combine(baseDirectory, fullPath)).TrimEnd('/', '\\');
-            Console.WriteLine("local path: {0}", localPath);
             string baseLocalPath = Path.GetFullPath(baseDirectory).TrimEnd('/', '\\');
-            Console.WriteLine("base path: {0}", baseLocalPath);
             if (!Path.GetFullPath(localPath).Contains(baseLocalPath))
                 throw new UnauthorizedAccessException("User tried to access out of base directory");
             return localPath;

@@ -47,6 +47,7 @@ namespace Zhaobang.FtpServer.Connections
         private int readOffset = 0;
 
         private DataConnectionMode dataConnectionMode = DataConnectionMode.Active;
+        private AddressFamily userActiveAddressFamily = AddressFamily.InterNetwork;
         private IPAddress userActiveIP;
         private int userActiveDataPort = 20;
 
@@ -112,7 +113,9 @@ namespace Zhaobang.FtpServer.Connections
         private enum DataConnectionMode
         {
             Passive,
-            Active
+            Active,
+            ExtendedPassive,
+            ExtendedActive
         }
 
         /// <summary>
@@ -140,9 +143,11 @@ namespace Zhaobang.FtpServer.Connections
             FileNoAccess = 550,
             FileSpaceInsufficient = 452,
             EnteringPassiveMode = 227,
+            EnteringEpsvMode = 229,
             AboutToOpenDataConnection = 150,
             NameSystemType = 215,
             FileActionPendingInfo = 350,
+            NotSupportedProtocal = 522
         }
 
         /// <summary>
@@ -299,8 +304,14 @@ namespace Zhaobang.FtpServer.Connections
                 case "PORT":
                     await CommandPortAsync(parameter);
                     return;
+                case "EPRT":
+                    await CommandEprtAsync(parameter);
+                    return;
                 case "PASV":
                     await CommandPasvAsync();
+                    return;
+                case "EPSV":
+                    await CommandEpsvAsync(parameter);
                     return;
                 case "TYPE":
                     switch (parameter)
@@ -616,8 +627,9 @@ namespace Zhaobang.FtpServer.Connections
                 int remotePort = (bytes[4] << 8) | bytes[5];
                 userActiveDataPort = remotePort;
                 userActiveIP = remoteIP;
+                userActiveAddressFamily = AddressFamily.InterNetwork;
                 dataConnectionMode = DataConnectionMode.Active;
-                await dataConnection.ConnectActiveAsync(remoteIP, remotePort);
+                await dataConnection.ConnectActiveAsync(remoteIP, remotePort, userActiveAddressFamily);
                 await ReplyAsync(FtpReplyCode.CommandOkay, "Data connection established");
                 return;
             }
@@ -630,6 +642,75 @@ namespace Zhaobang.FtpServer.Connections
             }
         }
 
+        private async Task CommandEprtAsync(string parameter)
+        {
+            if (string.IsNullOrEmpty(parameter))
+            {
+                await ReplyAsync(
+                    FtpReplyCode.SyntaxErrorInParametersOrArguments,
+                    "Syntax error, parameter is empty");
+                return;
+            }
+
+            var seperator = parameter[0];
+            var paramSegs = parameter.Split(seperator);
+
+            if (paramSegs.Length != 5)
+            {
+                await ReplyAsync(
+                    FtpReplyCode.SyntaxErrorInParametersOrArguments,
+                    "Syntax error, count of segments incorrect");
+                return;
+            }
+
+            AddressFamily addressFamily;
+            switch (paramSegs[1])
+            {
+                case "1":
+                    addressFamily = AddressFamily.InterNetwork;
+                    break;
+                case "2":
+                    addressFamily = AddressFamily.InterNetworkV6;
+                    break;
+                default:
+                    await ReplyAsync(
+                        FtpReplyCode.NotSupportedProtocal,
+                        "Network protocal not supported, use(1,2)");
+                    return;
+            }
+
+            IPAddress remoteIP;
+            int remotePort;
+            try
+            {
+                remoteIP = IPAddress.Parse(paramSegs[2]);
+                remotePort = int.Parse(paramSegs[3]);
+            }
+            catch(Exception)
+            {
+                await ReplyAsync(
+                    FtpReplyCode.SyntaxErrorInParametersOrArguments,
+                    "IP address or port number incorrect.");
+                return;
+            }
+            userActiveDataPort = remotePort;
+            userActiveIP = remoteIP;
+            userActiveAddressFamily = addressFamily;
+
+            dataConnectionMode = DataConnectionMode.ExtendedPassive;
+            await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort, userActiveAddressFamily);
+            await ReplyAsync(FtpReplyCode.CommandOkay, "Data connection established");
+        }
+
+        private async Task CommandEpsvAsync(string parameter)
+        {
+            var port = dataConnection.ExtendedListen();
+            dataConnectionMode = DataConnectionMode.ExtendedPassive;
+            await ReplyAsync(
+                FtpReplyCode.EnteringEpsvMode,
+                string.Format("Entering extended passive mode (|||{0}|).", port));
+        }
+
         private async Task OpenDataConnectionAsync()
         {
             if (dataConnection != null && dataConnection.IsOpen)
@@ -639,13 +720,16 @@ namespace Zhaobang.FtpServer.Connections
             else
             {
                 await ReplyAsync(FtpReplyCode.AboutToOpenDataConnection, "File is Ok, about to open connection.");
-                if (dataConnectionMode == DataConnectionMode.Active)
+                switch (dataConnectionMode)
                 {
-                    await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort);
-                }
-                else if (dataConnectionMode == DataConnectionMode.Passive)
-                {
-                    await dataConnection.AcceptAsync();
+                    case DataConnectionMode.Active:
+                    case DataConnectionMode.ExtendedActive:
+                        await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort, userActiveAddressFamily);
+                        break;
+                    case DataConnectionMode.Passive:
+                    case DataConnectionMode.ExtendedPassive:
+                        await dataConnection.AcceptAsync();
+                        break;
                 }
             }
         }
