@@ -5,12 +5,12 @@
     <PackageId>Zhaobang.FtpServer</PackageId>
     <Authors>Zhaoquan Huang</Authors>
     <Product>Ftp Server Library</Product>
-    <Description>A package for hosting an FTP server, with authenticating and file managing customizable</Description>
+    <Description>A package for hosting an FTP server, with authenticating and file managing customizable. Go to project site for usage example or executable version.</Description>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <Company>Zhaobang China</Company>
     <PackageProjectUrl>https://github.com/ZhaobangChina/FtpServer</PackageProjectUrl>
     <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
-    <Version>2.0.0-alpha</Version>
+    <Version>2.0.0-alpha2</Version>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <AssemblyName>Zhaobang.FtpServer</AssemblyName>
     <PackageLicenseUrl>https://github.com/ZhaobangChina/FtpServer/blob/master/LICENSE</PackageLicenseUrl>

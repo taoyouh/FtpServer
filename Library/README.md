@@ -8,7 +8,11 @@ The server allows anonymous login, and users can read and write in a public dire
 // using System.Net;
 // using System.Threading;
 // using Zhaobang.FtpServer;
-var endPoint = new IPEndPoint(IPAddress.IPv6Any, 21);
+
+var endPoint = new IPEndPoint(IPAddress.Any, 21);
+// To accept IPv6 connection, replace "IPAddress.Any" with "IPAddress.IPv6Any"
+// You need 2 FtpServer instances to accept both IPv4 and IPv6 connectins
+
 var baseDirectory = "C:\\FtpServer";
 var server = new FtpServer(endPoint, baseDirectory);
 
@@ -17,7 +21,8 @@ var runResult = server.RunAsync(cancelSource.Token);
 ```
 ### To stop the server
 ```
-cancelSource.Cancel();
+cancelSource.Cancel(); // Stop accepting new clients
+await runResult; // Wait until last client quits
 ```
 
 ## Customization
