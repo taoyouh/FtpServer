@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -73,13 +74,33 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="remoteIP">The IP to connect to</param>
         /// <param name="remotePort">The port to connect to</param>
-        /// <param name="addressFamily">The address family of connection</param>
+        /// <param name="protocal">Protocal ID defined in RFC 2428</param>
         /// <returns>The task to await</returns>
-        public async Task ConnectActiveAsync(IPAddress remoteIP, int remotePort, AddressFamily addressFamily)
+        public async Task ConnectActiveAsync(IPAddress remoteIP, int remotePort, int protocal)
         {
+            AddressFamily addressFamily;
+            switch(protocal)
+            {
+                case 1:
+                    addressFamily = AddressFamily.InterNetwork;
+                    break;
+                case 2:
+                    addressFamily = AddressFamily.InterNetworkV6;
+                    break;
+                default:
+                    throw new NotSupportedException();
+            }
             listeningPort = -1;
             TcpClient = new TcpClient(addressFamily);
             await TcpClient.ConnectAsync(remoteIP, remotePort);
+        }
+
+        /// <summary>
+        /// Gets the supported protocal IDs in active mode (defined in RFC 2824)
+        /// </summary>
+        public IEnumerable<int> SupportedActiveProtocal
+        {
+            get => new int[] { 1, 2 };
         }
 
         /// <summary>
@@ -124,10 +145,34 @@ namespace Zhaobang.FtpServer.Connections
         /// <summary>
         /// Listens for FTP EPSV connection and returns the listening port
         /// </summary>
+        /// <param name="protocal">The protocal ID to use. Defined in RFC 2824.</param>
         /// <returns>The port listening at</returns>
-        public int ExtendedListen()
+        public int ExtendedListen(int protocal)
         {
-            return Listen().Port;
+            if (SupportedPassiveProtocal.Contains(protocal))
+                return Listen().Port;
+            else
+                throw new NotSupportedException();
+        }
+        
+        /// <summary>
+        /// Gets the supported protocal IDs in passive mode (defined in RFC 2824)
+        /// </summary>
+        public IEnumerable<int> SupportedPassiveProtocal
+        {
+            get
+            {
+                switch (listeningIP.AddressFamily)
+                {
+                    case AddressFamily.InterNetwork:
+                        return new[] { 1 };
+                    case AddressFamily.InterNetworkV6:
+                        return new[] { 2 };
+                    default:
+                        return new int[0];
+                }
+
+            }
         }
 
         /// <summary>

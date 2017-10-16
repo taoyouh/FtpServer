@@ -47,7 +47,7 @@ namespace Zhaobang.FtpServer.Connections
         private int readOffset = 0;
 
         private DataConnectionMode dataConnectionMode = DataConnectionMode.Active;
-        private AddressFamily userActiveAddressFamily = AddressFamily.InterNetwork;
+        private int userActiveProtocal = 1;
         private IPAddress userActiveIP;
         private int userActiveDataPort = 20;
 
@@ -627,9 +627,9 @@ namespace Zhaobang.FtpServer.Connections
                 int remotePort = (bytes[4] << 8) | bytes[5];
                 userActiveDataPort = remotePort;
                 userActiveIP = remoteIP;
-                userActiveAddressFamily = AddressFamily.InterNetwork;
+                userActiveProtocal = 1;
                 dataConnectionMode = DataConnectionMode.Active;
-                await dataConnection.ConnectActiveAsync(remoteIP, remotePort, userActiveAddressFamily);
+                await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort, userActiveProtocal);
                 await ReplyAsync(FtpReplyCode.CommandOkay, "Data connection established");
                 return;
             }
@@ -663,20 +663,13 @@ namespace Zhaobang.FtpServer.Connections
                 return;
             }
 
-            AddressFamily addressFamily;
-            switch (paramSegs[1])
+            int remoteProtocal;
+            if (!int.TryParse(paramSegs[1], out remoteProtocal))
             {
-                case "1":
-                    addressFamily = AddressFamily.InterNetwork;
-                    break;
-                case "2":
-                    addressFamily = AddressFamily.InterNetworkV6;
-                    break;
-                default:
-                    await ReplyAsync(
-                        FtpReplyCode.NotSupportedProtocal,
-                        "Network protocal not supported, use(1,2)");
-                    return;
+                await ReplyAsync(
+                    FtpReplyCode.SyntaxErrorInParametersOrArguments,
+                    "Protocal ID incorrect");
+                return;
             }
 
             IPAddress remoteIP;
@@ -695,16 +688,51 @@ namespace Zhaobang.FtpServer.Connections
             }
             userActiveDataPort = remotePort;
             userActiveIP = remoteIP;
-            userActiveAddressFamily = addressFamily;
+            userActiveProtocal = remoteProtocal;
 
             dataConnectionMode = DataConnectionMode.ExtendedPassive;
-            await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort, userActiveAddressFamily);
+            try
+            {
+                await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort, userActiveProtocal);
+            }
+            catch(NotSupportedException)
+            {
+                var supportedProtocalString =
+                    string.Join(",", dataConnection.SupportedActiveProtocal.Select(x => x.ToString()));
+                await ReplyAsync(FtpReplyCode.NotSupportedProtocal, $"Protocal not supported, use({supportedProtocalString})");
+                return;
+
+            }
             await ReplyAsync(FtpReplyCode.CommandOkay, "Data connection established");
         }
 
         private async Task CommandEpsvAsync(string parameter)
         {
-            var port = dataConnection.ExtendedListen();
+            int port;
+            try
+            {
+                if (string.IsNullOrEmpty(parameter))
+                {
+                    port = dataConnection.Listen().Port;
+                }
+                else
+                {
+                    var protocal = int.Parse(parameter);
+                    port = dataConnection.ExtendedListen(protocal);
+                }
+            }
+            catch(FormatException)
+            {
+                await ReplyAsync(FtpReplyCode.SyntaxErrorInParametersOrArguments, "Protocal ID incorrect.");
+                return;
+            }
+            catch(NotSupportedException)
+            {
+                var supportedProtocalString =
+                    string.Join(",", dataConnection.SupportedPassiveProtocal.Select(x => x.ToString()));
+                await ReplyAsync(FtpReplyCode.NotSupportedProtocal, $"Protocal not supported, use({supportedProtocalString})");
+                return;
+            }
             dataConnectionMode = DataConnectionMode.ExtendedPassive;
             await ReplyAsync(
                 FtpReplyCode.EnteringEpsvMode,
@@ -724,7 +752,7 @@ namespace Zhaobang.FtpServer.Connections
                 {
                     case DataConnectionMode.Active:
                     case DataConnectionMode.ExtendedActive:
-                        await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort, userActiveAddressFamily);
+                        await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort, userActiveProtocal);
                         break;
                     case DataConnectionMode.Passive:
                     case DataConnectionMode.ExtendedPassive:

@@ -28,9 +28,14 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="remoteIP">The IP to connect to</param>
         /// <param name="remotePort">The port to connect to</param>
-        /// <param name="addressFamily">The address family of connection</param>
+        /// <param name="protocal">Protocal ID defined in RFC 2428</param>
         /// <returns>The task to await</returns>
-        Task ConnectActiveAsync(IPAddress remoteIP, int remotePort, AddressFamily addressFamily);
+        Task ConnectActiveAsync(IPAddress remoteIP, int remotePort, int protocal);
+
+        /// <summary>
+        /// Gets the supported protocal IDs in active mode (defined in RFC 2824)
+        /// </summary>
+        IEnumerable<int> SupportedActiveProtocal { get; }
 
         /// <summary>
         /// Listens for FTP passive connection and returns the listening end point
@@ -41,8 +46,14 @@ namespace Zhaobang.FtpServer.Connections
         /// <summary>
         /// Listens for FTP EPSV connection and returns the listening port
         /// </summary>
+        /// <param name="protocal">The protocal ID to use. Defined in RFC 2824.</param>
         /// <returns>The port listening at</returns>
-        int ExtendedListen();
+        int ExtendedListen(int protocal);
+
+        /// <summary>
+        /// Gets the supported protocal IDs in passive mode (defined in RFC 2824)
+        /// </summary>
+        IEnumerable<int> SupportedPassiveProtocal { get; }
 
         /// <summary>
         /// Accepts a FTP passive mode connection
