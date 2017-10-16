@@ -10,13 +10,17 @@
     <Company>Zhaobang China</Company>
     <PackageProjectUrl>https://github.com/ZhaobangChina/FtpServer</PackageProjectUrl>
     <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
-    <Version>2.0.0-alpha2</Version>
+    <Version>2.0.0-alpha3</Version>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <AssemblyName>Zhaobang.FtpServer</AssemblyName>
     <PackageLicenseUrl>https://github.com/ZhaobangChina/FtpServer/blob/master/LICENSE</PackageLicenseUrl>
-    <PackageReleaseNotes>Changed the classes for customization. Basic use is just as before</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0.0 alpha-3: Add extensibility for supporting more protocals, bug fix and improvements
+2.0.0 alpha-2: Add support of IPv6, support LIST command for a file
+2.0.0 alpha: Changed class structure for better extensibility</PackageReleaseNotes>
     <PackageTags>FTP</PackageTags>
     <NeutralLanguage>en-US</NeutralLanguage>
+    <AssemblyVersion>2.0.0.3</AssemblyVersion>
+    <FileVersion>2.0.0.3</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
