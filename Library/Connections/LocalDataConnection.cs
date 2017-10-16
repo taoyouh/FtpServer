@@ -17,7 +17,9 @@ namespace Zhaobang.FtpServer.Connections
     /// </summary>
     public class LocalDataConnection : IDisposable, IDataConnection
     {
-        private static LinkedList<int> availablePorts = new LinkedList<int>();
+        private const int MinPort = 1024;
+        private const int MaxPort = 65535;
+        private static int lastUsedPort = new Random().Next(MinPort, MaxPort);
 
         private readonly IPAddress listeningIP;
 
@@ -58,14 +60,7 @@ namespace Zhaobang.FtpServer.Connections
                     if (tcpClient != null)
                     {
                         tcpClient.Dispose();
-                        if (listeningPort != -1)
-                        {
-                            lock (availablePorts)
-                            {
-                                availablePorts.AddLast(listeningPort);
-                            }
-                            listeningPort = -1;
-                        }
+                        listeningPort = -1;
                     }
                     if (tcpClient != value)
                         tcpClient = value;
@@ -102,23 +97,19 @@ namespace Zhaobang.FtpServer.Connections
                 }
                 catch { }
             }
-            int port = 1050;
-            lock (availablePorts)
+            int port = lastUsedPort + 1;
+            int startPort = lastUsedPort + 1;
+            do
             {
-                if (availablePorts.First != null)
-                {
-                    port = availablePorts.First.Value;
-                    availablePorts.RemoveFirst();
-                }
-            }
-            while (port < 65536)
-            {
+                if (port > MaxPort)
+                    port = MinPort;
                 try
                 {
                     listeningPort = port;
                     var listeningEP = new IPEndPoint(listeningIP, listeningPort);
                     tcpListener = new TcpListener(listeningEP);
                     tcpListener.Start();
+                    lastUsedPort = port;
                     return listeningEP;
                 }
                 catch
@@ -126,6 +117,7 @@ namespace Zhaobang.FtpServer.Connections
                     port++;
                 }
             }
+            while (port != startPort);
             throw new Exception("There are no ports available");
         }
 
@@ -135,40 +127,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The port listening at</returns>
         public int ExtendedListen()
         {
-            if (tcpListener != null)
-            {
-                try
-                {
-                    tcpListener.Start();
-                    return listeningPort;
-                }
-                catch { }
-            }
-            int port = 1050;
-            lock (availablePorts)
-            {
-                if (availablePorts.First != null)
-                {
-                    port = availablePorts.First.Value;
-                    availablePorts.RemoveFirst();
-                }
-            }
-            while (port < 65536)
-            {
-                try
-                {
-                    listeningPort = port;
-                    var listeningEP = new IPEndPoint(listeningIP, listeningPort);
-                    tcpListener = new TcpListener(listeningEP);
-                    tcpListener.Start();
-                    return listeningEP.Port;
-                }
-                catch
-                {
-                    port++;
-                }
-            }
-            throw new Exception("There are no ports available");
+            return Listen().Port;
         }
 
         /// <summary>
@@ -226,13 +185,6 @@ namespace Zhaobang.FtpServer.Connections
                 ((IDisposable)TcpClient).Dispose();
             }
             tcpListener.Stop();
-            if (listeningPort >= 0)
-            {
-                lock (availablePorts)
-                {
-                    availablePorts.AddLast(listeningPort);
-                }
-            }
         }
 
         /// <summary>
