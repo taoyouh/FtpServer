@@ -3,8 +3,11 @@
 // </copyright>
 
 using System;
-using System.Net;
+using System.IO;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 namespace Zhaobang.FtpServer
 {
@@ -21,76 +24,60 @@ namespace Zhaobang.FtpServer
         {
             Console.WriteLine("Welcome to demo of FTP server!");
 
-            string baseDir = string.Empty;
-            IPEndPoint ep = new IPEndPoint(IPAddress.Any, 21);
-            for (int i = 0; i < args.Length; i++)
+            RunConfig config = RunConfig.Default;
+            XmlSerializer serializer = new XmlSerializer(typeof(RunConfig));
+            FileInfo configFileInfo = new FileInfo(Path.Combine(Environment.CurrentDirectory, "RunConfig.xml"));
+
+            if (configFileInfo.Exists)
             {
-                switch (args[i])
+                using (Stream configFileStream = configFileInfo.OpenRead())
                 {
-                    case "-d":
-                        try
-                        {
-                            baseDir = args[++i];
-                        }
-                        catch
-                        {
-                            Console.WriteLine("Directory incorrect");
-                            goto help;
-                        }
-                        break;
-                    case "-i":
-                        try
-                        {
-                            ep.Address = IPAddress.Parse(args[++i]);
-                        }
-                        catch
-                        {
-                            Console.WriteLine("IP incorrect");
-                            goto help;
-                        }
-                        break;
-                    case "-p":
-                        try
-                        {
-                            ep.Port = int.Parse(args[++i]);
-                        }
-                        catch
-                        {
-                            Console.WriteLine("Port incorrect");
-                            goto help;
-                        }
-                        break;
-                    case "?":
-                    case "help":
-                    case "-h":
-                    case "--help":
-                        help:
-                        Console.WriteLine("Usage: -d {Root Directory} [-i {Listening IP} [-p {Listening Port}]");
-                        return;
+                    config = serializer.Deserialize(configFileStream) as RunConfig;
+                }
+            }
+            else
+            {
+                using (Stream configFileStream = configFileInfo.OpenWrite())
+                {
+                    Console.WriteLine("Creating default config file at {0}", configFileInfo.FullName);
+                    serializer.Serialize(configFileStream, config);
+                    Console.WriteLine("Default config file created");
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(baseDir))
-            {
-                Console.WriteLine("Please input base directory");
-                baseDir = Console.ReadLine();
-            }
-
-            var server = new FtpServer(ep, baseDir);
-
             var cancelSource = new CancellationTokenSource();
-            var runResult = server.RunAsync(cancelSource.Token);
+            var runResults = config.EndPoints.Select(
+                ep => new FtpServer(ep, config.BaseDirectory)
+                    .RunAsync(cancelSource.Token)
+                    .ContinueWith(result =>
+                    {
+                        if (result.Exception != null)
+                        {
+                            Console.WriteLine($"Server at {ep} has stopped because of: \n{result.Exception.Message}\n");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Server at {ep} has stopped successfully.");
+                        }
+                    }))
+                .ToArray();
 
             Console.WriteLine("FTP server has been started.");
-            Console.WriteLine("Listening at: {0}", ep);
-            Console.WriteLine("Root dir: {0}", baseDir);
+            Console.WriteLine("Config file: \n\t{0}", configFileInfo.FullName);
+            Console.WriteLine("Root dir: \n\t{0}", config.BaseDirectory);
+            Console.WriteLine(
+                "End points:\n\t{0}",
+                string.Join("\n\t", config.EndPoints.Select(ep => ep.ToString())));
+            Console.WriteLine("Use command \"quit\" to stop FTP server");
+
             while (true)
             {
                 var command = Console.ReadLine();
                 if (command.ToUpper() == "QUIT")
                 {
                     cancelSource.Cancel();
-                    runResult.Wait();
+                    Console.WriteLine("Stopped accepting new connections. Waiting until all clients quit.");
+                    Task.WaitAll(runResults);
                     Console.WriteLine("Quited.");
                     return;
                 }
