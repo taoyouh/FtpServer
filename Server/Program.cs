@@ -22,7 +22,11 @@ namespace Zhaobang.FtpServer
         /// <param name="args">Argumentss entered in the shell/param>
         private static void Main(string[] args)
         {
-            Console.WriteLine("Welcome to demo of FTP server!");
+            Console.WriteLine("FTP Server by Zhaobang China");
+            Console.WriteLine("Server version: {0}", System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
+            Console.WriteLine("Library version: {0}", System.Reflection.Assembly.GetAssembly(typeof(FtpServer)).GetName().Version);
+            Console.WriteLine("This is an open source project. Project site: https://github.com/ZhaobangChina/FtpServer/tree/master/Server");
+            Console.WriteLine();
 
             RunConfig config = RunConfig.Default;
             XmlSerializer serializer = new XmlSerializer(typeof(RunConfig));

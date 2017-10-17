@@ -6,6 +6,9 @@
     <AssemblyName>ftpserver</AssemblyName>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <RuntimeIdentifiers>portable;win-x86;win-x64;osx-x64;linux-x64</RuntimeIdentifiers>
+    <Version>2.0.0-alpha4</Version>
+    <AssemblyVersion>2.0.0.4</AssemblyVersion>
+    <FileVersion>2.0.0.4</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
