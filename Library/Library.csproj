@@ -4,23 +4,26 @@
     <TargetFramework>netstandard1.4</TargetFramework>
     <PackageId>Zhaobang.FtpServer</PackageId>
     <Authors>Zhaoquan Huang</Authors>
-    <Product>Ftp Server Library</Product>
+    <Product>FTP Server Library</Product>
     <Description>A package for hosting an FTP server, with authenticating and file managing customizable. Go to project site for usage example or executable version.</Description>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <Company>Zhaobang China</Company>
     <PackageProjectUrl>https://github.com/ZhaobangChina/FtpServer</PackageProjectUrl>
     <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
-    <Version>2.0.0-alpha3</Version>
+    <Version>2.0.0</Version>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <AssemblyName>Zhaobang.FtpServer</AssemblyName>
     <PackageLicenseUrl>https://github.com/ZhaobangChina/FtpServer/blob/master/LICENSE</PackageLicenseUrl>
-    <PackageReleaseNotes>2.0.0 alpha-3: Add extensibility for supporting more protocals, bug fix and improvements
-2.0.0 alpha-2: Add support of IPv6, support LIST command for a file
-2.0.0 alpha: Changed class structure for better extensibility</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0.0:
+Add extensibility for supporting more protocals
+Add support of IPv6
+Support LIST command for a file
+Structure in 1.0.0 are changed for better extensibility
+Bug fix</PackageReleaseNotes>
     <PackageTags>FTP</PackageTags>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <AssemblyVersion>2.0.0.3</AssemblyVersion>
-    <FileVersion>2.0.0.3</FileVersion>
+    <AssemblyVersion>2.0.0.4</AssemblyVersion>
+    <FileVersion>2.0.0.4</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
