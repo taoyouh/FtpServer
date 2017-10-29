@@ -1,6 +1,12 @@
 # Zhaobang.FtpServer
 A FTP library for .NET Standard 1.4.
 
+Build Status [![Build status](https://ci.appveyor.com/api/projects/status/f1nxe8ru98x321s3/branch/master?svg=true)](https://ci.appveyor.com/project/taoyouh/ftpserver/branch/master)
+
+Get stable release[![Get stable release](https://img.shields.io/nuget/v/Zhaobang.FtpServer.svg)](https://www.nuget.org/packages/Zhaobang.FtpServer/)
+
+Get testing release[![Get testing release](https://img.shields.io/myget/zhaobang-ftpserver-nightly/vpre/Zhaobang.FtpServer.svg)](https://www.myget.org/feed/zhaobang-ftpserver-nightly/package/nuget/Zhaobang.FtpServer)
+
 ## Simple Usage
 The server allows anonymous login, and users can read and write in a public directory.
 ### To start the server

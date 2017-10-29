@@ -6,9 +6,9 @@
     <AssemblyName>ftpserver</AssemblyName>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <RuntimeIdentifiers>portable;win-x86;win-x64;osx-x64;linux-x64</RuntimeIdentifiers>
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.5</AssemblyVersion>
-    <FileVersion>2.0.0.5</FileVersion>
+    <Version>2.0.1</Version>
+    <AssemblyVersion>2.0.1.0</AssemblyVersion>
+    <FileVersion>2.0.1.0</FileVersion>
     <Authors>Zhaoquan Huang</Authors>
     <Company>Zhaobang China</Company>
     <Product>FTP Server</Product>

@@ -1,0 +1,29 @@
+version: 2.0.0-build{build}
+image: Visual Studio 2017
+configuration: Release
+dotnet_csproj:
+  patch: true
+  file: '**\*.csproj'
+  version: '{version}'
+  package_version: '{version}'
+  assembly_version: 2.0.0.{build}
+  file_version: 2.0.0.{build}
+  informational_version: 2.0.0.{build}
+cache: '%USERPROFILE%\.nuget\packages -> **\*.csproj'
+before_build:
+- ps: msbuild /t:restore /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+build:
+  verbosity: minimal
+after_build:
+- ps: msbuild /t:pack /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+artifacts:
+- path: '**/*.nupkg'
+deploy:
+- provider: NuGet
+  server: https://www.myget.org/F/zhaobang-ftpserver-nightly/api/v2/package
+  api_key:
+    secure: tRrj53sW6hpLkOYP9U4PJU9J/EQ2OmNCWrWgZhZ/eF6+DMoY+Ed/GUhG5P8lr8rV
+  skip_symbols: true
+  artifact: /.*(Zhaobang\.FtpServer\.).*nupkg/
+  on:
+    branch: master
