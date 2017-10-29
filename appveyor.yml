@@ -1,4 +1,4 @@
-version: 2.0.0-build{build}
+version: 2.0.1-build{build}
 image: Visual Studio 2017
 configuration: Release
 dotnet_csproj:
@@ -6,9 +6,9 @@ dotnet_csproj:
   file: '**\*.csproj'
   version: '{version}'
   package_version: '{version}'
-  assembly_version: 2.0.0.{build}
-  file_version: 2.0.0.{build}
-  informational_version: 2.0.0.{build}
+  assembly_version: 2.0.1.{build}
+  file_version: 2.0.1.{build}
+  informational_version: 2.0.1.{build}
 cache: '%USERPROFILE%\.nuget\packages -> **\*.csproj'
 before_build:
 - ps: msbuild /t:restore /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
