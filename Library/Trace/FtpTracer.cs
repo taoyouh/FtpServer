@@ -1,15 +1,32 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Zhaobang.FtpServer.Trace
 {
     /// <summary>
-    /// THe class for tracing FTP commands and replies
+    /// The class for tracing FTP commands and replies
     /// </summary>
     public class FtpTracer
     {
+        private ObservableCollection<IPEndPoint> connectedUsers = new ObservableCollection<IPEndPoint>();
+
+        private ReadOnlyObservableCollection<IPEndPoint> _connectedUsersView;
+
+        /// <summary>
+        /// The read-only collection of currently connected users. Lock the <see cref="FtpTracer"/>
+        /// instance when accessing this.
+        /// </summary>
+        public ReadOnlyObservableCollection<IPEndPoint> ConnectedUsersView => _connectedUsersView;
+
+        internal FtpTracer()
+        {
+            _connectedUsersView = new ReadOnlyObservableCollection<IPEndPoint>(connectedUsers);
+        }
+
         /// <summary>
         /// Event handler for tracing FTP commands
         /// </summary>
@@ -24,11 +41,14 @@ namespace Zhaobang.FtpServer.Trace
 
         internal void TraceCommand(string command, IPEndPoint remoteAddress)
         {
-            try
+            Task.Run(() =>
             {
-                CommandInvoked?.Invoke(command, remoteAddress);
-            }
-            catch { }
+                try
+                {
+                    CommandInvoked?.Invoke(command, remoteAddress);
+                }
+                catch { }
+            });
         }
 
         /// <summary>
@@ -45,11 +65,58 @@ namespace Zhaobang.FtpServer.Trace
 
         internal void TraceReply(string replyCode, IPEndPoint remoteAddress)
         {
-            try
+            Task.Run(() =>
             {
-                ReplyInvoked?.Invoke(replyCode, remoteAddress);
-            }
-            catch { }
+                try
+                {
+                    ReplyInvoked?.Invoke(replyCode, remoteAddress);
+                }
+                catch { }
+            });
+        }
+
+        /// <summary>
+        /// The event handler to handle user changes
+        /// </summary>
+        /// <param name="remoteAddress"></param>
+        public delegate void UserEventHandler(IPEndPoint remoteAddress);
+
+        /// <summary>
+        /// Fires when a user connects to the FTP server
+        /// </summary>
+        public event UserEventHandler UserConnected;
+
+        /// <summary>
+        /// Fires when a user disconnects from the FTP server
+        /// </summary>
+        public event UserEventHandler UserDisconnected;
+
+        internal void TraceUserConnection(IPEndPoint remoteAddress)
+        {
+            Task.Run(() =>
+            {
+                lock (this)
+                    connectedUsers.Add(remoteAddress);
+                try
+                {
+                    UserConnected?.Invoke(remoteAddress);
+                }
+                catch { }
+            });
+        }
+
+        internal void TraceUserDisconnection(IPEndPoint remoteAddress)
+        {
+            Task.Run(() =>
+            {
+                lock (this)
+                    connectedUsers.Remove(remoteAddress);
+                try
+                {
+                    UserDisconnected?.Invoke(remoteAddress);
+                }
+                catch { }
+            });
         }
     }
 }
