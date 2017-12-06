@@ -201,7 +201,7 @@ namespace Zhaobang.FtpServer.Connections
             var command = messageSegs[0];
             var parameter = messageSegs.Length < 2 ? string.Empty : messageSegs[1];
 
-            System.Diagnostics.Debug.WriteLine(message);
+            server.Tracer.TraceCommand(command, remoteEndPoint);
             switch (command.ToUpper())
             {
                 case "RNFR":
@@ -834,6 +834,7 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task ReplyAsync(FtpReplyCode code, string message)
         {
+            server.Tracer.TraceReply(((int)code).ToString(), remoteEndPoint);
             StringBuilder stringBuilder = new StringBuilder(6 + message.Length);
             stringBuilder.Append((int)code);
             stringBuilder.Append(' ');
@@ -846,6 +847,7 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task ReplyMultilineAsync(FtpReplyCode code, string message)
         {
+            server.Tracer.TraceReply(((int)code).ToString(), remoteEndPoint);
             message = message.Replace("\r", string.Empty);
             message = message.Replace("\n", "\r\n ");
             var stringToSend = string.Format("{0}-{1}\r\n{2} End\r\n", (int)code, message, (int)code);

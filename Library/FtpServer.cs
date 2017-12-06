@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using Zhaobang.FtpServer.Authenticate;
 using Zhaobang.FtpServer.Connections;
 using Zhaobang.FtpServer.File;
+using Zhaobang.FtpServer.Trace;
 
 namespace Zhaobang.FtpServer
 {
@@ -28,6 +29,8 @@ namespace Zhaobang.FtpServer
 
         private IPEndPoint endPoint;
         private TcpListener tcpListener;
+
+        private FtpTracer tracer = new FtpTracer();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FtpServer"/> class
@@ -66,6 +69,19 @@ namespace Zhaobang.FtpServer
             this.fileProviderFactory = fileProviderFactory;
             this.dataConnFactory = dataConnFactory;
             this.authenticator = authenticator;
+
+            tracer.CommandInvoked += Tracer_CommandInvoked;
+            tracer.ReplyInvoked += Tracer_ReplyInvoked;
+        }
+
+        private void Tracer_ReplyInvoked(string replyCode, IPEndPoint remoteAddress)
+        {
+            System.Diagnostics.Debug.WriteLine($"{remoteAddress}, reply, {replyCode}");
+        }
+
+        private void Tracer_CommandInvoked(string command, IPEndPoint remoteAddress)
+        {
+            System.Diagnostics.Debug.WriteLine($"{remoteAddress}, command, {command}");
         }
 
         /// <summary>
@@ -82,6 +98,11 @@ namespace Zhaobang.FtpServer
         /// Gets the manager that provides <see cref="IFileProviderFactory"/> for each user
         /// </summary>
         internal IFileProviderFactory FileManager { get => fileProviderFactory; }
+
+        /// <summary>
+        /// Gets the instance of <see cref="FtpTracer"/> to trace FTP commands and replies
+        /// </summary>
+        public FtpTracer Tracer => tracer;
 
         /// <summary>
         /// Start the FTP server

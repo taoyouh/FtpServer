@@ -51,8 +51,12 @@ namespace Zhaobang.FtpServer
 
             var cancelSource = new CancellationTokenSource();
             var runResults = config.EndPoints.Select(
-                ep => new FtpServer(ep, config.BaseDirectory)
-                    .RunAsync(cancelSource.Token)
+                ep =>
+                {
+                    var server = new FtpServer(ep, config.BaseDirectory);
+                    server.Tracer.CommandInvoked += Tracer_CommandInvoked;
+                    server.Tracer.ReplyInvoked += Tracer_ReplyInvoked;
+                    return server.RunAsync(cancelSource.Token)
                     .ContinueWith(result =>
                     {
                         if (result.Exception != null)
@@ -63,7 +67,8 @@ namespace Zhaobang.FtpServer
                         {
                             Console.WriteLine($"Server at {ep} has stopped successfully.");
                         }
-                    }))
+                    });
+                })
                 .ToArray();
 
             Console.WriteLine("FTP server has been started.");
@@ -86,6 +91,16 @@ namespace Zhaobang.FtpServer
                     return;
                 }
             }
+        }
+
+        private static void Tracer_ReplyInvoked(string replyCode, System.Net.IPEndPoint remoteAddress)
+        {
+            Console.WriteLine($"{remoteAddress}, reply, {replyCode}");
+        }
+
+        private static void Tracer_CommandInvoked(string command, System.Net.IPEndPoint remoteAddress)
+        {
+            Console.WriteLine($"{remoteAddress}, command, {command}");
         }
     }
 }
