@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -103,6 +104,11 @@ namespace Zhaobang.FtpServer
         /// Gets the instance of <see cref="FtpTracer"/> to trace FTP commands and replies
         /// </summary>
         public FtpTracer Tracer => tracer;
+
+        /// <summary>
+        /// The certificate for FTP over TLS. Keep it null to disable FTP over TLS.
+        /// </summary>
+        public X509Certificate Certificate { get; set; }
 
         /// <summary>
         /// Start the FTP server
