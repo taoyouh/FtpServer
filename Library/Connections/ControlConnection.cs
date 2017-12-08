@@ -167,6 +167,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The task that finishes when control connection is closed</returns>
         public async Task RunAsync(CancellationToken cancellationToken)
         {
+            server.Tracer.TraceUserConnection(remoteEndPoint);
             try
             {
                 await ReplyAsync(FtpReplyCode.ServiceReady, "FtpServer by Taoyou is now ready");
@@ -192,6 +193,7 @@ namespace Zhaobang.FtpServer.Connections
             finally
             {
                 Dispose();
+                server.Tracer.TraceUserDisconnection(remoteEndPoint);
             }
         }
 

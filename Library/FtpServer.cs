@@ -30,7 +30,7 @@ namespace Zhaobang.FtpServer
         private IPEndPoint endPoint;
         private TcpListener tcpListener;
 
-        private FtpTracer tracer = new FtpTracer();
+        private readonly FtpTracer tracer = new FtpTracer();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FtpServer"/> class
@@ -74,12 +74,12 @@ namespace Zhaobang.FtpServer
             tracer.ReplyInvoked += Tracer_ReplyInvoked;
         }
 
-        private void Tracer_ReplyInvoked(string replyCode, IPEndPoint remoteAddress)
+        private static void Tracer_ReplyInvoked(string replyCode, IPEndPoint remoteAddress)
         {
             System.Diagnostics.Debug.WriteLine($"{remoteAddress}, reply, {replyCode}");
         }
 
-        private void Tracer_CommandInvoked(string command, IPEndPoint remoteAddress)
+        private static void Tracer_CommandInvoked(string command, IPEndPoint remoteAddress)
         {
             System.Diagnostics.Debug.WriteLine($"{remoteAddress}, command, {command}");
         }
