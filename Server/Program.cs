@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -84,7 +85,7 @@ namespace Zhaobang.FtpServer
             while (true)
             {
                 var command = Console.ReadLine();
-                if (command.ToUpper() == "QUIT")
+                if (command.ToUpper(CultureInfo.InvariantCulture) == "QUIT")
                 {
                     cancelSource.Cancel();
                     Console.WriteLine("Stopped accepting new connections. Waiting until all clients quit.");
@@ -92,12 +93,12 @@ namespace Zhaobang.FtpServer
                     Console.WriteLine("Quited.");
                     return;
                 }
-                else if (command.ToUpper() == "USERS")
+                else if (command.ToUpper(CultureInfo.InvariantCulture) == "USERS")
                 {
                     Console.WriteLine("Connected users:");
                     foreach (var server in servers)
                     {
-                        lock (server.Tracer)
+                        lock (server.Tracer.ConnectedUsersSyncRoot)
                         {
                             foreach (var user in server.Tracer.ConnectedUsersView)
                             {

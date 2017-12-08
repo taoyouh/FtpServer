@@ -12,15 +12,20 @@ namespace Zhaobang.FtpServer.Trace
     /// </summary>
     public class FtpTracer
     {
-        private ObservableCollection<IPEndPoint> connectedUsers = new ObservableCollection<IPEndPoint>();
+        private readonly ObservableCollection<IPEndPoint> connectedUsers = new ObservableCollection<IPEndPoint>();
 
-        private ReadOnlyObservableCollection<IPEndPoint> _connectedUsersView;
+        private readonly ReadOnlyObservableCollection<IPEndPoint> _connectedUsersView;
 
         /// <summary>
-        /// The read-only collection of currently connected users. Lock the <see cref="FtpTracer"/>
-        /// instance when accessing this.
+        /// The read-only collection of currently connected users. Lock <see cref="ConnectedUsersView"/>
+        /// when accessing this.
         /// </summary>
         public ReadOnlyObservableCollection<IPEndPoint> ConnectedUsersView => _connectedUsersView;
+
+        /// <summary>
+        /// The sync root for <see cref="ConnectedUsersView"/>.
+        /// </summary>
+        public object ConnectedUsersSyncRoot { get; } = new object();
 
         internal FtpTracer()
         {
@@ -95,7 +100,7 @@ namespace Zhaobang.FtpServer.Trace
         {
             Task.Run(() =>
             {
-                lock (this)
+                lock (ConnectedUsersSyncRoot)
                     connectedUsers.Add(remoteAddress);
                 try
                 {
@@ -109,7 +114,7 @@ namespace Zhaobang.FtpServer.Trace
         {
             Task.Run(() =>
             {
-                lock (this)
+                lock (ConnectedUsersSyncRoot)
                     connectedUsers.Remove(remoteAddress);
                 try
                 {
