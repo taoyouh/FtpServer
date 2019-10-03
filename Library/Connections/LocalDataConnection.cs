@@ -135,7 +135,10 @@ namespace Zhaobang.FtpServer.Connections
                     tcpListener.Start();
                     return new IPEndPoint(listeningIP, listeningPort);
                 }
-                catch { } // If can't start the listener, proceed below to create a new one.
+                catch
+                {
+                    // If can't start the listener, proceed below to create a new one.
+                }
             }
             int port = lastUsedPort + 1;
             int startPort = lastUsedPort + 1;

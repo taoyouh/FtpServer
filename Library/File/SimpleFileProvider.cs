@@ -270,7 +270,11 @@ namespace Zhaobang.FtpServer.File
                         },
                     };
                 }
-                catch (FileNotFoundException) { } // If the path doesn't refer to a file, try if it refers to a directory.
+                catch (FileNotFoundException)
+                {
+                    // If the path doesn't refer to a file, try if it refers to a directory.
+                }
+
                 var directories = Directory.GetDirectories(localPath)
                     .Select(x => new DirectoryInfo(x))
                     .Select(x => new FileSystemEntry
