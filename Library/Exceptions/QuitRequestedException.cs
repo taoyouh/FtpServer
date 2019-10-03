@@ -9,7 +9,7 @@ using System.Text;
 namespace Zhaobang.FtpServer.Exceptions
 {
     /// <summary>
-    /// The user requested to quit
+    /// The user requested to quit.
     /// </summary>
     internal class QuitRequestedException : Exception
     {
@@ -18,6 +18,7 @@ namespace Zhaobang.FtpServer.Exceptions
         /// </summary>
         public QuitRequestedException()
             : base("The user has requested to quit")
-        { }
+        {
+        }
     }
 }

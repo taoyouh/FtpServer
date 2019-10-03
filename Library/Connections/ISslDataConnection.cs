@@ -1,4 +1,8 @@
-﻿using System;
+﻿// <copyright file="ISslDataConnection.cs" company="Zhaoquan Huang">
+// Copyright (c) Zhaoquan Huang. All rights reserved
+// </copyright>
+
+using System;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;

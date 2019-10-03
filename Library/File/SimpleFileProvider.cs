@@ -13,26 +13,26 @@ using System.Threading.Tasks;
 namespace Zhaobang.FtpServer.File
 {
     /// <summary>
-    /// Provides the same root directory to all users
+    /// Provides the same root directory to all users.
     /// </summary>
     public class SimpleFileProvider : IFileProvider
     {
         /// <summary>
-        /// The root directory for ftp
+        /// The root directory for ftp.
         /// </summary>
         private string baseDirectory;
 
         /// <summary>
         /// The remote working directory path, without '/' at start.
         /// Use <see cref="GetLocalPath(string)"/> to get local
-        /// working directory
+        /// working directory.
         /// </summary>
         private string workingDirectory = string.Empty;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SimpleFileProvider"/> class.
         /// </summary>
-        /// <param name="baseDirectory">The root directory of the user</param>
+        /// <param name="baseDirectory">The root directory of the user.</param>
         public SimpleFileProvider(string baseDirectory)
         {
             if (!Directory.Exists(baseDirectory))
@@ -43,19 +43,19 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Gets the FTP working directory
+        /// Gets the FTP working directory.
         /// </summary>
-        /// <returns>The FTP working directory absolute path</returns>
+        /// <returns>The FTP working directory absolute path.</returns>
         public string GetWorkingDirectory()
         {
             return "/" + workingDirectory;
         }
 
         /// <summary>
-        /// Sets the FTP working directory
+        /// Sets the FTP working directory.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of working directory</param>
-        /// <returns>Whether the setting succeeded or not</returns>
+        /// <param name="path">Absolute or relative FTP path of working directory.</param>
+        /// <returns>Whether the setting succeeded or not.</returns>
         public bool SetWorkingDirectory(string path)
         {
             try
@@ -78,10 +78,10 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Creates a directory
+        /// Creates a directory.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of the directory</param>
-        /// <returns>The task to await</returns>
+        /// <param name="path">Absolute or relative FTP path of the directory.</param>
+        /// <returns>The task to await.</returns>
 #pragma warning disable CS1998
         public async Task CreateDirectoryAsync(string path)
 #pragma warning restore CS1998
@@ -90,10 +90,10 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Deletes a directory
+        /// Deletes a directory.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of the directory</param>
-        /// <returns>The task to await</returns>
+        /// <param name="path">Absolute or relative FTP path of the directory.</param>
+        /// <returns>The task to await.</returns>
 #pragma warning disable CS1998
         public async Task DeleteDirectoryAsync(string path)
 #pragma warning restore CS1998
@@ -107,10 +107,10 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Deletes a file
+        /// Deletes a file.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of the file</param>
-        /// <returns>The task to await</returns>
+        /// <param name="path">Absolute or relative FTP path of the file.</param>
+        /// <returns>The task to await.</returns>
 #pragma warning disable CS1998
         public async Task DeleteAsync(string path)
 #pragma warning restore CS1998
@@ -119,11 +119,11 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Renames or moves a file or directory
+        /// Renames or moves a file or directory.
         /// </summary>
-        /// <param name="fromPath">Absolute or relative FTP path of source file or directory</param>
-        /// <param name="toPath">Absolute or relative FTP path of target file or directory</param>
-        /// <returns>The task to await</returns>
+        /// <param name="fromPath">Absolute or relative FTP path of source file or directory.</param>
+        /// <param name="toPath">Absolute or relative FTP path of target file or directory.</param>
+        /// <returns>The task to await.</returns>
 #pragma warning disable CS1998
         public async Task RenameAsync(string fromPath, string toPath)
 #pragma warning restore CS1998
@@ -134,12 +134,12 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Opens a file for reading
+        /// Opens a file for reading.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of the file</param>
-        /// <returns>The file stream</returns>
-        /// <exception cref="FileBusyException"/>
-        /// <exception cref="FileNoAccessException"/>
+        /// <param name="path">Absolute or relative FTP path of the file.</param>
+        /// <returns>The file stream.</returns>
+        /// <exception cref="FileBusyException">The file is temporarily unavailable.</exception>
+        /// <exception cref="FileNoAccessException">The file can't be obtained.</exception>
 #pragma warning disable CS1998
         public async Task<Stream> OpenFileForReadAsync(string path)
 #pragma warning restore CS1998
@@ -149,7 +149,7 @@ namespace Zhaobang.FtpServer.File
                 string localPath = GetLocalPath(path);
                 return System.IO.File.OpenRead(localPath);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (ex is ArgumentException ||
                     ex is ArgumentNullException ||
@@ -168,8 +168,8 @@ namespace Zhaobang.FtpServer.File
         /// Opens a file for writing.
         /// If the file already exists, opens it instead.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of the file</param>
-        /// <returns>The file stream</returns>
+        /// <param name="path">Absolute or relative FTP path of the file.</param>
+        /// <returns>The file stream.</returns>
 #pragma warning disable CS1998
         public async Task<Stream> OpenFileForWriteAsync(string path)
 #pragma warning restore CS1998
@@ -182,10 +182,10 @@ namespace Zhaobang.FtpServer.File
         /// Creates a new file for writing.
         /// If the file already exists, replace it instead.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of the file</param>
-        /// <returns>The file stream</returns>
-        /// <exception cref="FileSpaceInsufficientException"/>
-        /// <exception cref="FileBusyException"/>
+        /// <param name="path">Absolute or relative FTP path of the file.</param>
+        /// <returns>The file stream.</returns>
+        /// <exception cref="FileSpaceInsufficientException">Failed to create the file and a retry will not succeed.</exception>
+        /// <exception cref="FileBusyException">The operation failed but worth a retry.</exception>
 #pragma warning disable CS1998
         public async Task<Stream> CreateFileForWriteAsync(string path)
 #pragma warning restore CS1998
@@ -195,7 +195,7 @@ namespace Zhaobang.FtpServer.File
                 string localPath = GetLocalPath(path);
                 return System.IO.File.Create(localPath);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 if (ex is ArgumentException ||
                     ex is ArgumentNullException ||
@@ -210,12 +210,12 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Gets the names of files and directories
+        /// Gets the names of files and directories.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of the file</param>
-        /// <returns>The names of items</returns>
-        /// <exception cref="FileBusyException"/>
-        /// <exception cref="FileNoAccessException"/>
+        /// <param name="path">Absolute or relative FTP path of the file.</param>
+        /// <returns>The names of items.</returns>
+        /// <exception cref="FileBusyException">The operation failed but worth a retry.</exception>
+        /// <exception cref="FileNoAccessException">The listing can't be obtained.</exception>
 #pragma warning disable CS1998
         public async Task<IEnumerable<string>> GetNameListingAsync(string path)
 #pragma warning restore CS1998
@@ -244,10 +244,10 @@ namespace Zhaobang.FtpServer.File
         /// If the path is a directory, gets the info of its contents.
         /// If the path is a file, gets its info.
         /// </summary>
-        /// <param name="path">Absolute or relative FTP path of the file</param>
-        /// <returns>The info of items in <see cref="FileInfo"/> or <see cref="DirectoryInfo"/></returns>
-        /// <exception cref="FileBusyException"/>
-        /// <exception cref="FileNoAccessException"/>
+        /// <param name="path">Absolute or relative FTP path of the file.</param>
+        /// <returns>The info of items in <see cref="FileInfo"/> or <see cref="DirectoryInfo"/>.</returns>
+        /// <exception cref="FileBusyException">The operation failed but worth a retry.</exception>
+        /// <exception cref="FileNoAccessException">The listing can't be obtained.</exception>
 #pragma warning disable CS1998
         public async Task<IEnumerable<FileSystemEntry>> GetListingAsync(string path)
 #pragma warning restore CS1998
@@ -258,14 +258,17 @@ namespace Zhaobang.FtpServer.File
                 try
                 {
                     FileInfo fileInfo = new FileInfo(localPath);
-                    return new[] {new FileSystemEntry
+                    return new[]
                     {
-                        Name=fileInfo.Name,
-                        IsDirectory=false,
-                        Length=fileInfo.Length,
-                        IsReadOnly=fileInfo.IsReadOnly,
-                        LastWriteTime=fileInfo.LastWriteTime
-                    } };
+                        new FileSystemEntry
+                        {
+                            Name = fileInfo.Name,
+                            IsDirectory = false,
+                            Length = fileInfo.Length,
+                            IsReadOnly = fileInfo.IsReadOnly,
+                            LastWriteTime = fileInfo.LastWriteTime,
+                        },
+                    };
                 }
                 catch (FileNotFoundException) { }
                 var directories = Directory.GetDirectories(localPath)
@@ -276,7 +279,7 @@ namespace Zhaobang.FtpServer.File
                         IsDirectory = true,
                         Length = 0,
                         IsReadOnly = false,
-                        LastWriteTime = x.LastWriteTime
+                        LastWriteTime = x.LastWriteTime,
                     });
                 var files = Directory.GetFiles(localPath)
                     .Select(x => new FileInfo(x))
@@ -286,7 +289,7 @@ namespace Zhaobang.FtpServer.File
                         IsDirectory = false,
                         Length = x.Length,
                         IsReadOnly = x.IsReadOnly,
-                        LastWriteTime = x.LastWriteTime
+                        LastWriteTime = x.LastWriteTime,
                     });
                 return directories.Concat<FileSystemEntry>(files);
             }
@@ -304,12 +307,28 @@ namespace Zhaobang.FtpServer.File
             }
         }
 
-        /// <exception cref="ArgumentException"/>
-        /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="UnauthorizedAccessException"/>
-        /// <exception cref="SecurityException"/>
-        /// <exception cref="NotSupportedException"/>
-        /// <exception cref="PathTooLongException"/>
+        /// <exception cref="ArgumentException">
+        /// By <see cref="Path.Combine(string, string)"/>: path1 or path2 contains one or more of the invalid characters defined in System.IO.Path.GetInvalidPathChars.
+        /// By <see cref="Path.GetFullPath(string)"/>: path is a zero-length string, contains only white space, or contains one or more
+        /// of the invalid characters defined in System.IO.Path.GetInvalidPathChars. -or-
+        /// The system could not retrieve the absolute path.
+        /// </exception>
+        /// <exception cref="ArgumentNullException">
+        /// <paramref name="path"/> is null.
+        /// </exception>
+        /// <exception cref="UnauthorizedAccessException">
+        /// <paramref name="path"/> tries to access parent folders.
+        /// </exception>
+        /// <exception cref="SecurityException">
+        /// By <see cref="Path.GetFullPath(string)"/>: The caller does not have the required permissions.
+        /// </exception>
+        /// <exception cref="NotSupportedException">
+        /// By <see cref="Path.GetFullPath(string)"/>: path contains a colon (":") that is not part of a volume identifier (for example,
+        /// "c:\").
+        /// </exception>
+        /// <exception cref="PathTooLongException">
+        /// By <see cref="Path.GetFullPath(string)"/>: The specified path, file name, or both exceed the system-defined maximum length.
+        /// </exception>
         private string GetLocalPath(string path)
         {
             string fullPath = Path.Combine(workingDirectory, path).TrimStart('/', '\\');

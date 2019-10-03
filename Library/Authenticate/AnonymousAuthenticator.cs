@@ -9,16 +9,16 @@ using System.Text;
 namespace Zhaobang.FtpServer.Authenticate
 {
     /// <summary>
-    /// A simple authenticator that only allows anonymous authenticator
+    /// A simple authenticator that only allows anonymous authenticator.
     /// </summary>
     public class AnonymousAuthenticator : IAuthenticator
     {
         /// <summary>
-        /// Returns true
+        /// Allows anonymous access.
         /// </summary>
-        /// <param name="userName">The user name user inputted</param>
-        /// <param name="password">The password user inputted</param>
-        /// <returns>True</returns>
+        /// <param name="userName">The user name user inputted.</param>
+        /// <param name="password">The password user inputted.</param>
+        /// <returns>Whether the user name is "anonymous".</returns>
         public bool Authenticate(string userName, string password)
         {
             return userName.ToUpper() == "ANONYMOUS";

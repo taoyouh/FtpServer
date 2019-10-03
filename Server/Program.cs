@@ -18,14 +18,14 @@ using Zhaobang.FtpServer.File;
 namespace Zhaobang.FtpServer
 {
     /// <summary>
-    /// The main program
+    /// The main program.
     /// </summary>
     internal class Program
     {
         /// <summary>
-        /// The entry point of the program
+        /// The entry point of the program.
         /// </summary>
-        /// <param name="args">Argumentss entered in the shell/param>
+        /// <param name="args">Argumentss entered in the shell/param>.
         private static void Main(string[] args)
         {
             Console.WriteLine("FTP Server by Zhaobang China");

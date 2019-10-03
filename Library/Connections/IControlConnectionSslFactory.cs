@@ -1,4 +1,8 @@
-﻿using System;
+﻿// <copyright file="IControlConnectionSslFactory.cs" company="Zhaoquan Huang">
+// Copyright (c) Zhaoquan Huang. All rights reserved
+// </copyright>
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -14,7 +18,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <summary>
         /// Upgrades a plain text stream to an encrypted stream.
         /// </summary>
-        /// <param name="plainTextStream">The plain text stream to upgrade</param>
+        /// <param name="plainTextStream">The plain text stream to upgrade.</param>
         /// <returns>The task with the upgraded stream.</returns>
         Task<Stream> UpgradeAsync(Stream plainTextStream);
 

@@ -21,7 +21,7 @@ namespace Zhaobang.FtpServer.File
         /// Initializes a new instance of the <see cref="SimpleFileProviderFactory"/> class.
         /// Every user shares the same root directory.
         /// </summary>
-        /// <param name="baseDirectory">The root directory of FTP</param>
+        /// <param name="baseDirectory">The root directory of FTP.</param>
         public SimpleFileProviderFactory(string baseDirectory)
         {
             if (!Directory.Exists(baseDirectory))
@@ -32,10 +32,10 @@ namespace Zhaobang.FtpServer.File
         }
 
         /// <summary>
-        /// Gets provider for the specified user
+        /// Gets provider for the specified user.
         /// </summary>
-        /// <param name="user">The name of the user</param>
-        /// <returns>The <see cref="SimpleFileProvider"/> for that user</returns>
+        /// <param name="user">The name of the user.</param>
+        /// <returns>The <see cref="SimpleFileProvider"/> for that user.</returns>
         public IFileProvider GetProvider(string user)
         {
             return new SimpleFileProvider(baseDirectory);
