@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Security;
 using System.Text;
 using System.Xml.Serialization;
 
@@ -30,6 +31,10 @@ namespace Zhaobang.FtpServer
         public List<IPEndPointData> EndPoints { get; set; } = new List<IPEndPointData>();
 
         public string BaseDirectory { get; set; } = "./";
+
+        public string CertificatePath { get; set; } = string.Empty;
+
+        public string CertificatePassword { get; set; } = string.Empty;
 
         public struct IPEndPointData
         {
