@@ -392,7 +392,7 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task CommandAuthAsync(string parameter)
         {
-            if ((parameter != "TLS" && parameter != "SSL") || server.ControlConnectionSslFactory != null)
+            if ((parameter != "TLS" && parameter != "SSL") || server.ControlConnectionSslFactory == null)
             {
                 await ReplyAsync(FtpReplyCode.NotImplemented, "Not supported");
                 return;
