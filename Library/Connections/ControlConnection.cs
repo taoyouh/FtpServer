@@ -276,7 +276,7 @@ namespace Zhaobang.FtpServer.Connections
                     await ReplyMultilineAsync(FtpReplyCode.SystemStatus, "Supports:\nUTF8");
                     return;
                 case "OPTS":
-                    if (parameter.ToUpper() == "UTF8 ON")
+                    if (parameter.ToLowerInvariant() == "UTF8 ON")
                     {
                         encoding = Encoding.UTF8;
                         await ReplyAsync(FtpReplyCode.CommandOkay, "UTF-8 is on");
@@ -335,16 +335,17 @@ namespace Zhaobang.FtpServer.Connections
                             return;
                     }
                 case "MODE":
-                    switch (parameter)
+                    if (parameter == "S")
                     {
-                        case "S":
-                            transmissionMode = TransmissionMode.Stream;
-                            await ReplyAsync(FtpReplyCode.CommandOkay, "In stream mode");
-                            return;
-                        default:
-                            await ReplyAsync(FtpReplyCode.ParameterNotImplemented, "Unknown mode");
-                            return;
+                        transmissionMode = TransmissionMode.Stream;
+                        await ReplyAsync(FtpReplyCode.CommandOkay, "In stream mode");
                     }
+                    else
+                    {
+                        await ReplyAsync(FtpReplyCode.ParameterNotImplemented, "Unknown mode");
+                    }
+
+                    return;
                 case "QUIT":
                     if (server.ControlConnectionSslFactory != null)
                     {

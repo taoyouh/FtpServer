@@ -20,7 +20,7 @@ namespace Zhaobang.FtpServer.File
         /// <summary>
         /// The root directory for ftp.
         /// </summary>
-        private string baseDirectory;
+        private readonly string baseDirectory;
 
         /// <summary>
         /// The remote working directory path, without '/' at start.
@@ -270,7 +270,7 @@ namespace Zhaobang.FtpServer.File
                         },
                     };
                 }
-                catch (FileNotFoundException) { }
+                catch (FileNotFoundException) { } // If the path doesn't refer to a file, try if it refers to a directory.
                 var directories = Directory.GetDirectories(localPath)
                     .Select(x => new DirectoryInfo(x))
                     .Select(x => new FileSystemEntry

@@ -13,8 +13,8 @@ namespace Zhaobang.FtpServer.Authenticate
     /// </summary>
     public class SimpleAuthenticator : IAuthenticator
     {
-        private string userName;
-        private string password;
+        private readonly string userName;
+        private readonly string password;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SimpleAuthenticator"/> class.
