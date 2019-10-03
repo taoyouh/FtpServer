@@ -41,13 +41,8 @@ namespace Zhaobang.FtpServer
         /// <param name="endPoint">The local end point to listen, usually 0.0.0.0:21</param>
         /// <param name="baseDirectory">The directory to provide files</param>
         public FtpServer(IPEndPoint endPoint, string baseDirectory)
+            : this(endPoint, new SimpleFileProviderFactory(baseDirectory), new LocalDataConnectionFactory(), new AnonymousAuthenticator())
         {
-            this.endPoint = endPoint;
-            tcpListener = new TcpListener(endPoint);
-
-            fileProviderFactory = new SimpleFileProviderFactory(baseDirectory);
-            dataConnFactory = new LocalDataConnectionFactory();
-            authenticator = new AnonymousAuthenticator();
         }
 
         /// <summary>
