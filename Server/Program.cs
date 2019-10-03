@@ -3,6 +3,8 @@
 // </copyright>
 
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -31,6 +33,7 @@ namespace Zhaobang.FtpServer
             RunConfig config = RunConfig.Default;
             XmlSerializer serializer = new XmlSerializer(typeof(RunConfig));
             FileInfo configFileInfo = new FileInfo(Path.Combine(Environment.CurrentDirectory, "RunConfig.xml"));
+            List<FtpServer> servers = new List<FtpServer>();
 
             if (configFileInfo.Exists)
             {
@@ -54,8 +57,7 @@ namespace Zhaobang.FtpServer
                 ep =>
                 {
                     var server = new FtpServer(ep, config.BaseDirectory);
-                    server.Tracer.CommandInvoked += Tracer_CommandInvoked;
-                    server.Tracer.ReplyInvoked += Tracer_ReplyInvoked;
+                    servers.Add(server);
                     return server.RunAsync(cancelSource.Token)
                     .ContinueWith(result =>
                     {
@@ -77,12 +79,13 @@ namespace Zhaobang.FtpServer
             Console.WriteLine(
                 "End points:\n\t{0}",
                 string.Join("\n\t", config.EndPoints.Select(ep => ep.ToString())));
-            Console.WriteLine("Use command \"quit\" to stop FTP server");
+            Console.WriteLine("Use command \"quit\" to stop FTP server.");
+            Console.WriteLine("Use command \"users\" to list connected users.");
 
             while (true)
             {
                 var command = Console.ReadLine();
-                if (command.ToUpper() == "QUIT")
+                if (command.ToUpper(CultureInfo.InvariantCulture) == "QUIT")
                 {
                     cancelSource.Cancel();
                     Console.WriteLine("Stopped accepting new connections. Waiting until all clients quit.");
@@ -90,17 +93,21 @@ namespace Zhaobang.FtpServer
                     Console.WriteLine("Quited.");
                     return;
                 }
+                else if (command.ToUpper(CultureInfo.InvariantCulture) == "USERS")
+                {
+                    Console.WriteLine("Connected users:");
+                    foreach (var server in servers)
+                    {
+                        lock (server.Tracer.ConnectedUsersSyncRoot)
+                        {
+                            foreach (var user in server.Tracer.ConnectedUsersView)
+                            {
+                                Console.WriteLine(user.ToString());
+                            }
+                        }
+                    }
+                }
             }
-        }
-
-        private static void Tracer_ReplyInvoked(string replyCode, System.Net.IPEndPoint remoteAddress)
-        {
-            Console.WriteLine($"{remoteAddress}, reply, {replyCode}");
-        }
-
-        private static void Tracer_CommandInvoked(string command, System.Net.IPEndPoint remoteAddress)
-        {
-            Console.WriteLine($"{remoteAddress}, command, {command}");
         }
     }
 }
