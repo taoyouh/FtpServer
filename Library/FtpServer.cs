@@ -23,9 +23,10 @@ namespace Zhaobang.FtpServer
     /// </summary>
     public sealed class FtpServer
     {
-        private IDataConnectionFactory dataConnFactory;
-        private IAuthenticator authenticator;
-        private IFileProviderFactory fileProviderFactory;
+        private readonly IDataConnectionFactory dataConnFactory;
+        private readonly IAuthenticator authenticator;
+        private readonly IFileProviderFactory fileProviderFactory;
+        private readonly IControlConnectionSslFactory controlConnectionSslFactory;
 
         private IPEndPoint endPoint;
         private TcpListener tcpListener;
@@ -40,13 +41,8 @@ namespace Zhaobang.FtpServer
         /// <param name="endPoint">The local end point to listen, usually 0.0.0.0:21</param>
         /// <param name="baseDirectory">The directory to provide files</param>
         public FtpServer(IPEndPoint endPoint, string baseDirectory)
+            : this(endPoint, new SimpleFileProviderFactory(baseDirectory), new LocalDataConnectionFactory(), new AnonymousAuthenticator())
         {
-            this.endPoint = endPoint;
-            tcpListener = new TcpListener(endPoint);
-
-            fileProviderFactory = new SimpleFileProviderFactory(baseDirectory);
-            dataConnFactory = new LocalDataConnectionFactory();
-            authenticator = new AnonymousAuthenticator();
         }
 
         /// <summary>
@@ -62,6 +58,25 @@ namespace Zhaobang.FtpServer
             IFileProviderFactory fileProviderFactory,
             IDataConnectionFactory dataConnFactory,
             IAuthenticator authenticator)
+            : this(endPoint, fileProviderFactory, dataConnFactory, authenticator, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FtpServer"/> class.
+        /// The server uses custom file, data connection, and authentication, and control connection SSL provider.
+        /// </summary>
+        /// <param name="endPoint">The local end point to listen, usually 0.0.0.0:21</param>
+        /// <param name="fileProviderFactory">The <see cref="IFileProviderFactory"/> to use</param>
+        /// <param name="dataConnFactory">The <see cref="IDataConnectionFactory"/> to use</param>
+        /// <param name="authenticator">The <see cref="IAuthenticator"/> to use</param>
+        /// <param name="controlConnectionSslFactory">The <see cref="IControlConnectionSslFactory"/> to upgrade control connection to SSL.</param>
+        public FtpServer(
+            IPEndPoint endPoint,
+            IFileProviderFactory fileProviderFactory,
+            IDataConnectionFactory dataConnFactory,
+            IAuthenticator authenticator,
+            IControlConnectionSslFactory controlConnectionSslFactory)
         {
             this.endPoint = endPoint;
             tcpListener = new TcpListener(endPoint);
@@ -69,6 +84,7 @@ namespace Zhaobang.FtpServer
             this.fileProviderFactory = fileProviderFactory;
             this.dataConnFactory = dataConnFactory;
             this.authenticator = authenticator;
+            this.controlConnectionSslFactory = controlConnectionSslFactory;
 
             tracer.CommandInvoked += Tracer_CommandInvoked;
             tracer.ReplyInvoked += Tracer_ReplyInvoked;
@@ -98,6 +114,8 @@ namespace Zhaobang.FtpServer
         /// Gets the manager that provides <see cref="IFileProviderFactory"/> for each user
         /// </summary>
         internal IFileProviderFactory FileManager { get => fileProviderFactory; }
+
+        internal IControlConnectionSslFactory ControlConnectionSslFactory => controlConnectionSslFactory;
 
         /// <summary>
         /// Gets the instance of <see cref="FtpTracer"/> to trace FTP commands and replies

@@ -7,9 +7,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
+using Zhaobang.FtpServer.Authenticate;
+using Zhaobang.FtpServer.Connections;
+using Zhaobang.FtpServer.File;
 
 namespace Zhaobang.FtpServer
 {
@@ -52,61 +56,82 @@ namespace Zhaobang.FtpServer
                 }
             }
 
-            var cancelSource = new CancellationTokenSource();
-            var runResults = config.EndPoints.Select(
-                ep =>
-                {
-                    var server = new FtpServer(ep, config.BaseDirectory);
-                    servers.Add(server);
-                    return server.RunAsync(cancelSource.Token)
-                    .ContinueWith(result =>
-                    {
-                        if (result.Exception != null)
-                        {
-                            Console.WriteLine($"Server at {ep} has stopped because of: \n{result.Exception.Message}\n");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"Server at {ep} has stopped successfully.");
-                        }
-                    });
-                })
-                .ToArray();
-
-            Console.WriteLine("FTP server has been started.");
-            Console.WriteLine("Config file: \n\t{0}", configFileInfo.FullName);
-            Console.WriteLine("Root dir: \n\t{0}", config.BaseDirectory);
-            Console.WriteLine(
-                "End points:\n\t{0}",
-                string.Join("\n\t", config.EndPoints.Select(ep => ep.ToString())));
-            Console.WriteLine("Use command \"quit\" to stop FTP server.");
-            Console.WriteLine("Use command \"users\" to list connected users.");
-
-            while (true)
+            X509Certificate certificate = null;
+            try
             {
-                var command = Console.ReadLine();
-                if (command.ToUpper(CultureInfo.InvariantCulture) == "QUIT")
+                if (!string.IsNullOrEmpty(config.CertificatePath))
                 {
-                    cancelSource.Cancel();
-                    Console.WriteLine("Stopped accepting new connections. Waiting until all clients quit.");
-                    Task.WaitAll(runResults);
-                    Console.WriteLine("Quited.");
-                    return;
+                    certificate = new X509Certificate(config.CertificatePath, config.CertificatePassword);
+                    config.CertificatePassword = null;
                 }
-                else if (command.ToUpper(CultureInfo.InvariantCulture) == "USERS")
-                {
-                    Console.WriteLine("Connected users:");
-                    foreach (var server in servers)
+
+                var cancelSource = new CancellationTokenSource();
+                var runResults = config.EndPoints.Select(
+                    ep =>
                     {
-                        lock (server.Tracer.ConnectedUsersSyncRoot)
+                        var fileProviderFactory = new SimpleFileProviderFactory(config.BaseDirectory);
+                        var dataConnectionFactory =
+                            certificate == null ? new LocalDataConnectionFactory() : (IDataConnectionFactory)new SslLocalDataConnectionFactory(certificate);
+                        var authenticator = new AnonymousAuthenticator();
+                        var controlConnectionSslFactory =
+                            certificate == null ? null : new ControlConnectionSslFactory(certificate);
+                        var server = new FtpServer(ep, fileProviderFactory, dataConnectionFactory, authenticator, controlConnectionSslFactory);
+
+                        servers.Add(server);
+                        return server.RunAsync(cancelSource.Token)
+                        .ContinueWith(result =>
                         {
-                            foreach (var user in server.Tracer.ConnectedUsersView)
+                            if (result.Exception != null)
                             {
-                                Console.WriteLine(user.ToString());
+                                Console.WriteLine($"Server at {ep} has stopped because of: \n{result.Exception.Message}\n");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Server at {ep} has stopped successfully.");
+                            }
+                        });
+                    })
+                    .ToArray();
+
+                Console.WriteLine("FTP server has been started.");
+                Console.WriteLine("Config file: \n\t{0}", configFileInfo.FullName);
+                Console.WriteLine("Root dir: \n\t{0}", config.BaseDirectory);
+                Console.WriteLine(
+                    "End points:\n\t{0}",
+                    string.Join("\n\t", config.EndPoints.Select(ep => ep.ToString())));
+                Console.WriteLine("Use command \"quit\" to stop FTP server.");
+                Console.WriteLine("Use command \"users\" to list connected users.");
+
+                while (true)
+                {
+                    var command = Console.ReadLine();
+                    if (command.ToUpper(CultureInfo.InvariantCulture) == "QUIT")
+                    {
+                        cancelSource.Cancel();
+                        Console.WriteLine("Stopped accepting new connections. Waiting until all clients quit.");
+                        Task.WaitAll(runResults);
+                        Console.WriteLine("Quited.");
+                        return;
+                    }
+                    else if (command.ToUpper(CultureInfo.InvariantCulture) == "USERS")
+                    {
+                        Console.WriteLine("Connected users:");
+                        foreach (var server in servers)
+                        {
+                            lock (server.Tracer.ConnectedUsersSyncRoot)
+                            {
+                                foreach (var user in server.Tracer.ConnectedUsersView)
+                                {
+                                    Console.WriteLine(user.ToString());
+                                }
                             }
                         }
                     }
                 }
+            }
+            finally
+            {
+                certificate.Dispose();
             }
         }
     }

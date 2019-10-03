@@ -1,8 +1,0 @@
-<?xml version="1.0"?>
-<RunConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <EndPoints>
-    <IPEndPointData Address="0.0.0.0" Port="21" />
-    <IPEndPointData Address="::" Port="21" />
-  </EndPoints>
-  <BaseDirectory>./</BaseDirectory>
-</RunConfig>

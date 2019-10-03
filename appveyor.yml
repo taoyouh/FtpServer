@@ -1,14 +1,19 @@
-version: 2.0.1-build{build}
-image: Visual Studio 2017
+version: 2.1.0-build{build}
+pull_requests:
+  do_not_increment_build_number: true
+branches:
+  only:
+  - master
+image: Visual Studio 2019
 configuration: Release
 dotnet_csproj:
   patch: true
   file: '**\*.csproj'
   version: '{version}'
   package_version: '{version}'
-  assembly_version: 2.0.1.{build}
-  file_version: 2.0.1.{build}
-  informational_version: 2.0.1.{build}
+  assembly_version: 2.1.0.{build}
+  file_version: 2.1.0.{build}
+  informational_version: 2.1.0.{build}
 cache: '%USERPROFILE%\.nuget\packages -> **\*.csproj'
 before_build:
 - ps: msbuild /t:restore /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"

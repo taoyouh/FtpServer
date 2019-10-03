@@ -27,7 +27,7 @@ namespace Zhaobang.FtpServer.Connections
 
         private readonly FtpServer server;
         private readonly TcpClient tcpClient;
-        private readonly NetworkStream stream;
+        private Stream stream;
 
         private readonly IPEndPoint remoteEndPoint;
         private readonly IPEndPoint localEndPoint;
@@ -68,6 +68,8 @@ namespace Zhaobang.FtpServer.Connections
         private DataType dataType = DataType.ASCII;
 
         private ListFormat listFormat = ListFormat.Unix;
+
+        private bool useSecureDataConnection = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ControlConnection"/> class.
@@ -147,7 +149,8 @@ namespace Zhaobang.FtpServer.Connections
             AboutToOpenDataConnection = 150,
             NameSystemType = 215,
             FileActionPendingInfo = 350,
-            NotSupportedProtocal = 522
+            NotSupportedProtocal = 522,
+            ProceedWithNegotiation = 234
         }
 
         /// <summary>
@@ -342,6 +345,10 @@ namespace Zhaobang.FtpServer.Connections
                             return;
                     }
                 case "QUIT":
+                    if (server.ControlConnectionSslFactory != null)
+                    {
+                        await server.ControlConnectionSslFactory.DisconnectAsync(stream);
+                    }
                     throw new QuitRequestedException();
                 case "RETR":
                     await CommandRetrAsync(parameter);
@@ -373,8 +380,49 @@ namespace Zhaobang.FtpServer.Connections
                 case "NOOP":
                     await ReplyAsync(FtpReplyCode.CommandOkay, "OK");
                     return;
+                case "AUTH":
+                    await CommandAuthAsync(parameter);
+                    return;
+                case "PROT":
+                    await CommandProtAsync(parameter);
+                    return;
             }
             await ReplyAsync(FtpReplyCode.CommandUnrecognized, "Can't recognize this command.");
+        }
+
+        private async Task CommandAuthAsync(string parameter)
+        {
+            if ((parameter != "TLS" && parameter != "SSL") || server.ControlConnectionSslFactory == null)
+            {
+                await ReplyAsync(FtpReplyCode.NotImplemented, "Not supported");
+                return;
+            }
+            await ReplyAsync(FtpReplyCode.ProceedWithNegotiation, "Authenticating");
+            stream = await server.ControlConnectionSslFactory.UpgradeAsync(stream);
+        }
+
+        private async Task CommandProtAsync(string parameter)
+        {
+            switch (parameter)
+            {
+                case "C":
+                    useSecureDataConnection = false;
+                    break;
+                case "S":
+                case "E":
+                case "P":
+                    if (!(dataConnection is ISslDataConnection))
+                    {
+                        await ReplyAsync(FtpReplyCode.ParameterNotImplemented, "Parameter not implemented");
+                        return;
+                    }
+                    useSecureDataConnection = true;
+                    break;
+                default:
+                    await ReplyAsync(FtpReplyCode.ParameterNotImplemented, "Parameter not implemented");
+                    return;
+            }
+            await ReplyAsync(FtpReplyCode.CommandOkay, "Secure level set");
         }
 
         private async Task CommandRnfrAsync(string parameter)
@@ -761,6 +809,10 @@ namespace Zhaobang.FtpServer.Connections
                         await dataConnection.AcceptAsync();
                         break;
                 }
+            }
+            if (useSecureDataConnection)
+            {
+                await (dataConnection as ISslDataConnection).UpgradeToSslAsync();
             }
         }
 
