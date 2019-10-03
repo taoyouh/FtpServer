@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace Zhaobang.FtpServer.Connections
 {
+#if NETSTANDARD2_1
     /// <summary>
     /// Establish data connection from local sever
     /// </summary>
@@ -20,7 +21,7 @@ namespace Zhaobang.FtpServer.Connections
         private static int lastUsedPort = new Random().Next(MinPort, MaxPort);
 
         private readonly IPAddress listeningIP;
-
+        private readonly X509Certificate certificate;
         private TcpClient tcpClient;
         private Stream tcpStream;
 
@@ -37,9 +38,11 @@ namespace Zhaobang.FtpServer.Connections
         /// NO connection will be initiated immediately.
         /// </summary>
         /// <param name="localIP">The IP which was connected by the user</param>
-        public SslLocalDataConnection(IPAddress localIP)
+        /// <param name="certificate">The certificate to upgrade to encrypted stream.</param>
+        public SslLocalDataConnection(IPAddress localIP, X509Certificate certificate)
         {
             listeningIP = localIP;
+            this.certificate = certificate ?? throw new ArgumentNullException(nameof(certificate));
         }
 
         /// <summary>
@@ -246,11 +249,12 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="certificate"></param>
         /// <returns></returns>
-        public async Task UpgradeToSslAsync(X509Certificate certificate)
+        public async Task UpgradeToSslAsync()
         {
             var sslStream = new SslStream(tcpStream);
             await sslStream.AuthenticateAsServerAsync(certificate);
             tcpStream = sslStream;
         }
     }
+#endif
 }

@@ -7,9 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -345,6 +343,10 @@ namespace Zhaobang.FtpServer.Connections
                             return;
                     }
                 case "QUIT":
+                    if (server.ControlConnectionSslFactory != null)
+                    {
+                        await server.ControlConnectionSslFactory.DisconnectAsync(stream);
+                    }
                     throw new QuitRequestedException();
                 case "RETR":
                     await CommandRetrAsync(parameter);
@@ -376,30 +378,25 @@ namespace Zhaobang.FtpServer.Connections
                 case "NOOP":
                     await ReplyAsync(FtpReplyCode.CommandOkay, "OK");
                     return;
-#if NETSTANDARD2_0
                 case "AUTH":
                     await CommandAuthAsync(parameter);
                     return;
                 case "PROT":
                     await CommandProtAsync(parameter);
                     return;
-#endif
             }
             await ReplyAsync(FtpReplyCode.CommandUnrecognized, "Can't recognize this command.");
         }
 
-#if NETSTANDARD2_0
         private async Task CommandAuthAsync(string parameter)
         {
-            if ((parameter != "TLS" && parameter != "SSL") || server.Certificate == null)
+            if ((parameter != "TLS" && parameter != "SSL") || server.ControlConnectionSslFactory != null)
             {
                 await ReplyAsync(FtpReplyCode.NotImplemented, "Not supported");
                 return;
             }
             await ReplyAsync(FtpReplyCode.ProceedWithNegotiation, "Authenticating");
-            SslStream sslStream = new SslStream(stream);
-            await sslStream.AuthenticateAsServerAsync(server.Certificate);
-            stream = sslStream;
+            stream = await server.ControlConnectionSslFactory.UpgradeAsync(stream);
         }
 
         private async Task CommandProtAsync(string parameter)
@@ -425,7 +422,6 @@ namespace Zhaobang.FtpServer.Connections
             }
             await ReplyAsync(FtpReplyCode.CommandOkay, "Secure level set");
         }
-#endif
 
         private async Task CommandRnfrAsync(string parameter)
         {
@@ -814,7 +810,7 @@ namespace Zhaobang.FtpServer.Connections
             }
             if (useSecureDataConnection)
             {
-                await (dataConnection as ISslDataConnection).UpgradeToSslAsync(server.Certificate);
+                await (dataConnection as ISslDataConnection).UpgradeToSslAsync();
             }
         }
 

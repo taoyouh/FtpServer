@@ -8,7 +8,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,6 +26,7 @@ namespace Zhaobang.FtpServer
         private IDataConnectionFactory dataConnFactory;
         private IAuthenticator authenticator;
         private IFileProviderFactory fileProviderFactory;
+        private IControlConnectionSslFactory controlConnectionSslFactory;
 
         private IPEndPoint endPoint;
         private TcpListener tcpListener;
@@ -63,6 +63,25 @@ namespace Zhaobang.FtpServer
             IFileProviderFactory fileProviderFactory,
             IDataConnectionFactory dataConnFactory,
             IAuthenticator authenticator)
+            : this(endPoint, fileProviderFactory, dataConnFactory, authenticator, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FtpServer"/> class.
+        /// The server uses custom file, data connection, and authentication, and control connection SSL provider.
+        /// </summary>
+        /// <param name="endPoint">The local end point to listen, usually 0.0.0.0:21</param>
+        /// <param name="fileProviderFactory">The <see cref="IFileProviderFactory"/> to use</param>
+        /// <param name="dataConnFactory">The <see cref="IDataConnectionFactory"/> to use</param>
+        /// <param name="authenticator">The <see cref="IAuthenticator"/> to use</param>
+        /// <param name="controlConnectionSslFactory">The <see cref="IControlConnectionSslFactory"/> to upgrade control connection to SSL.</param>
+        public FtpServer(
+            IPEndPoint endPoint,
+            IFileProviderFactory fileProviderFactory,
+            IDataConnectionFactory dataConnFactory,
+            IAuthenticator authenticator,
+            IControlConnectionSslFactory controlConnectionSslFactory)
         {
             this.endPoint = endPoint;
             tcpListener = new TcpListener(endPoint);
@@ -70,6 +89,7 @@ namespace Zhaobang.FtpServer
             this.fileProviderFactory = fileProviderFactory;
             this.dataConnFactory = dataConnFactory;
             this.authenticator = authenticator;
+            this.controlConnectionSslFactory = controlConnectionSslFactory;
 
             tracer.CommandInvoked += Tracer_CommandInvoked;
             tracer.ReplyInvoked += Tracer_ReplyInvoked;
@@ -100,15 +120,12 @@ namespace Zhaobang.FtpServer
         /// </summary>
         internal IFileProviderFactory FileManager { get => fileProviderFactory; }
 
+        internal IControlConnectionSslFactory ControlConnectionSslFactory => controlConnectionSslFactory;
+
         /// <summary>
         /// Gets the instance of <see cref="FtpTracer"/> to trace FTP commands and replies
         /// </summary>
         public FtpTracer Tracer => tracer;
-
-        /// <summary>
-        /// The certificate for FTP over TLS. Keep it null to disable FTP over TLS.
-        /// </summary>
-        public X509Certificate Certificate { get; set; }
 
         /// <summary>
         /// Start the FTP server
