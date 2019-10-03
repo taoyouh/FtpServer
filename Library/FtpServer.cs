@@ -23,10 +23,10 @@ namespace Zhaobang.FtpServer
     /// </summary>
     public sealed class FtpServer
     {
-        private IDataConnectionFactory dataConnFactory;
-        private IAuthenticator authenticator;
-        private IFileProviderFactory fileProviderFactory;
-        private IControlConnectionSslFactory controlConnectionSslFactory;
+        private readonly IDataConnectionFactory dataConnFactory;
+        private readonly IAuthenticator authenticator;
+        private readonly IFileProviderFactory fileProviderFactory;
+        private readonly IControlConnectionSslFactory controlConnectionSslFactory;
 
         private IPEndPoint endPoint;
         private TcpListener tcpListener;

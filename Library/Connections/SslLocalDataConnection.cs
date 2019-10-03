@@ -8,9 +8,9 @@ using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
+#if NETSTANDARD2_1
 namespace Zhaobang.FtpServer.Connections
 {
-#if NETSTANDARD2_1
     /// <summary>
     /// Establish data connection from local sever
     /// </summary>
@@ -247,7 +247,6 @@ namespace Zhaobang.FtpServer.Connections
         /// <summary>
         /// Upgrade the connection to SSL stream
         /// </summary>
-        /// <param name="certificate"></param>
         /// <returns></returns>
         public async Task UpgradeToSslAsync()
         {
@@ -256,5 +255,5 @@ namespace Zhaobang.FtpServer.Connections
             tcpStream = sslStream;
         }
     }
-#endif
 }
+#endif

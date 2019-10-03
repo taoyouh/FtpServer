@@ -4,9 +4,9 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
+#if NETSTANDARD2_1
 namespace Zhaobang.FtpServer.Connections
 {
-#if NETSTANDARD2_1
     /// <summary>
     /// The implementation of SSL or TLS data connection factory using <see cref="System.Net.Security.SslStream"/>
     /// </summary>
@@ -33,5 +33,5 @@ namespace Zhaobang.FtpServer.Connections
             return new SslLocalDataConnection(localIP, certificate);
         }
     }
-#endif
 }
+#endif

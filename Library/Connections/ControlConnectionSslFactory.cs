@@ -6,9 +6,9 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
+#if NETSTANDARD2_1
 namespace Zhaobang.FtpServer.Connections
 {
-#if NETSTANDARD2_1
     /// <summary>
     /// The implementation of <see cref="IControlConnectionSslFactory"/> using <see cref="SslStream"/>.
     /// </summary>
@@ -47,5 +47,5 @@ namespace Zhaobang.FtpServer.Connections
             return s;
         }
     }
-#endif
 }
+#endif
