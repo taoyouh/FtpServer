@@ -1,4 +1,8 @@
-﻿using System;
+﻿// <copyright file="SslLocalDataConnection.cs" company="Zhaoquan Huang">
+// Copyright (c) Zhaoquan Huang. All rights reserved
+// </copyright>
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,7 +16,7 @@ using System.Threading.Tasks;
 namespace Zhaobang.FtpServer.Connections
 {
     /// <summary>
-    /// Establish data connection from local sever
+    /// Establish data connection from local sever.
     /// </summary>
     public class SslLocalDataConnection : IDisposable, IDataConnection, ISslDataConnection
     {
@@ -33,11 +37,11 @@ namespace Zhaobang.FtpServer.Connections
         private TcpListener tcpListener;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="LocalDataConnection"/> class.
+        /// Initializes a new instance of the <see cref="SslLocalDataConnection"/> class.
         /// The class is used to maintain FTP data connection for ONE user.
         /// NO connection will be initiated immediately.
         /// </summary>
-        /// <param name="localIP">The IP which was connected by the user</param>
+        /// <param name="localIP">The IP which was connected by the user.</param>
         /// <param name="certificate">The certificate to upgrade to encrypted stream.</param>
         public SslLocalDataConnection(IPAddress localIP, X509Certificate certificate)
         {
@@ -46,11 +50,38 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Gets a value indicating whether a data connection is open
+        /// Gets a value indicating whether a data connection is open.
         /// </summary>
         public bool IsOpen
         {
             get { return TcpClient != null && TcpClient.Connected; }
+        }
+
+        /// <summary>
+        /// Gets the supported protocal IDs in active mode (defined in RFC 2824).
+        /// </summary>
+        public IEnumerable<int> SupportedActiveProtocal
+        {
+            get => new int[] { 1, 2 };
+        }
+
+        /// <summary>
+        /// Gets the supported protocal IDs in passive mode (defined in RFC 2824).
+        /// </summary>
+        public IEnumerable<int> SupportedPassiveProtocal
+        {
+            get
+            {
+                switch (listeningIP.AddressFamily)
+                {
+                    case AddressFamily.InterNetwork:
+                        return new[] { 1 };
+                    case AddressFamily.InterNetworkV6:
+                        return new[] { 2 };
+                    default:
+                        return new int[0];
+                }
+            }
         }
 
         private TcpClient TcpClient
@@ -75,12 +106,12 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Initiates a data connection in FTP active mode
+        /// Initiates a data connection in FTP active mode.
         /// </summary>
-        /// <param name="remoteIP">The IP to connect to</param>
-        /// <param name="remotePort">The port to connect to</param>
-        /// <param name="protocal">Protocal ID defined in RFC 2428</param>
-        /// <returns>The task to await</returns>
+        /// <param name="remoteIP">The IP to connect to.</param>
+        /// <param name="remotePort">The port to connect to.</param>
+        /// <param name="protocal">Protocal ID defined in RFC 2428.</param>
+        /// <returns>The task to await.</returns>
         public async Task ConnectActiveAsync(IPAddress remoteIP, int remotePort, int protocal)
         {
             AddressFamily addressFamily;
@@ -101,17 +132,9 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Gets the supported protocal IDs in active mode (defined in RFC 2824)
+        /// Listens for FTP passive connection and returns the listening end point.
         /// </summary>
-        public IEnumerable<int> SupportedActiveProtocal
-        {
-            get => new int[] { 1, 2 };
-        }
-
-        /// <summary>
-        /// Listens for FTP passive connection and returns the listening end point
-        /// </summary>
-        /// <returns>The end point listening at</returns>
+        /// <returns>The end point listening at.</returns>
         public IPEndPoint Listen()
         {
             if (tcpListener != null)
@@ -148,10 +171,10 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Listens for FTP EPSV connection and returns the listening port
+        /// Listens for FTP EPSV connection and returns the listening port.
         /// </summary>
         /// <param name="protocal">The protocal ID to use. Defined in RFC 2824.</param>
-        /// <returns>The port listening at</returns>
+        /// <returns>The port listening at.</returns>
         public int ExtendedListen(int protocal)
         {
             if (SupportedPassiveProtocal.Contains(protocal))
@@ -161,29 +184,9 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Gets the supported protocal IDs in passive mode (defined in RFC 2824)
+        /// Accepts a FTP passive mode connection.
         /// </summary>
-        public IEnumerable<int> SupportedPassiveProtocal
-        {
-            get
-            {
-                switch (listeningIP.AddressFamily)
-                {
-                    case AddressFamily.InterNetwork:
-                        return new[] { 1 };
-                    case AddressFamily.InterNetworkV6:
-                        return new[] { 2 };
-                    default:
-                        return new int[0];
-                }
-
-            }
-        }
-
-        /// <summary>
-        /// Accepts a FTP passive mode connection
-        /// </summary>
-        /// <returns>The task to await</returns>
+        /// <returns>The task to await.</returns>
         public async Task AcceptAsync()
         {
             TcpClient = await tcpListener.AcceptTcpClientAsync();
@@ -192,9 +195,9 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Disconnects any open connection
+        /// Disconnects any open connection.
         /// </summary>
-        /// <returns>The task to await</returns>
+        /// <returns>The task to await.</returns>
 #pragma warning disable CS1998
         public async Task DisconnectAsync()
 #pragma warning restore CS1998
@@ -207,10 +210,10 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Copies content to data connection
+        /// Copies content to data connection.
         /// </summary>
-        /// <param name="streamToRead">The stream to copy from</param>
-        /// <returns>The task to await</returns>
+        /// <param name="streamToRead">The stream to copy from.</param>
+        /// <returns>The task to await.</returns>
         public async Task SendAsync(Stream streamToRead)
         {
             await streamToRead.CopyToAsync(tcpStream);
@@ -218,17 +221,17 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Copies content from data connection
+        /// Copies content from data connection.
         /// </summary>
-        /// <param name="streamToWrite">The stream to copy to</param>
-        /// <returns>The task to await</returns>
+        /// <param name="streamToWrite">The stream to copy to.</param>
+        /// <returns>The task to await.</returns>
         public async Task RecieveAsync(Stream streamToWrite)
         {
             await tcpStream.CopyToAsync(streamToWrite);
         }
 
         /// <summary>
-        /// Close the connection and listener
+        /// Close the connection and listener.
         /// </summary>
         public void Close()
         {
@@ -237,7 +240,7 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Dispose of the connection and listener
+        /// Dispose of the connection and listener.
         /// </summary>
         public void Dispose()
         {
@@ -245,9 +248,9 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Upgrade the connection to SSL stream
+        /// Upgrade the connection to SSL stream.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The task of the async operation.</returns>
         public async Task UpgradeToSslAsync()
         {
             var sslStream = new SslStream(tcpStream);

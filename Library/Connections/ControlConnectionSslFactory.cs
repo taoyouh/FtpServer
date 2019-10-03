@@ -1,4 +1,8 @@
-﻿using System;
+﻿// <copyright file="ControlConnectionSslFactory.cs" company="Zhaoquan Huang">
+// Copyright (c) Zhaoquan Huang. All rights reserved
+// </copyright>
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Security;
@@ -17,7 +21,7 @@ namespace Zhaobang.FtpServer.Connections
         private readonly X509Certificate certificate;
 
         /// <summary>
-        /// Initializes an instance of <see cref="ControlConnectionSslFactory"/>.
+        /// Initializes a new instance of the <see cref="ControlConnectionSslFactory"/> class.
         /// </summary>
         /// <param name="certificate">The certificate for the SSL or TLS authenticate.</param>
         public ControlConnectionSslFactory(X509Certificate certificate)
@@ -38,7 +42,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <summary>
         /// Upgrades a plain text stream to an encrypted stream.
         /// </summary>
-        /// <param name="plainTextStream">The plain text stream to upgrade</param>
+        /// <param name="plainTextStream">The plain text stream to upgrade.</param>
         /// <returns>The task with the upgraded stream.</returns>
         public async Task<Stream> UpgradeAsync(Stream plainTextStream)
         {

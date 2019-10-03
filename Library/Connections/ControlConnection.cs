@@ -18,7 +18,7 @@ using Zhaobang.FtpServer.File;
 namespace Zhaobang.FtpServer.Connections
 {
     /// <summary>
-    /// Used to maintain the FTP control connection
+    /// Used to maintain the FTP control connection.
     /// </summary>
     internal class ControlConnection : IDisposable
     {
@@ -27,7 +27,6 @@ namespace Zhaobang.FtpServer.Connections
 
         private readonly FtpServer server;
         private readonly TcpClient tcpClient;
-        private Stream stream;
 
         private readonly IPEndPoint remoteEndPoint;
         private readonly IPEndPoint localEndPoint;
@@ -37,6 +36,8 @@ namespace Zhaobang.FtpServer.Connections
         /// <see cref="LocalDataConnection.IsOpen"/> before usage.
         /// </summary>
         private readonly IDataConnection dataConnection;
+
+        private Stream stream;
 
         private Encoding encoding = Encoding.UTF8;
         private string userName = string.Empty;
@@ -58,12 +59,12 @@ namespace Zhaobang.FtpServer.Connections
         private IFileProvider fileProvider;
 
         /// <summary>
-        /// Only stream mode is supported
+        /// Only stream mode is supported.
         /// </summary>
         private TransmissionMode transmissionMode = TransmissionMode.Stream;
 
         /// <summary>
-        /// This is ignored
+        /// This is ignored.
         /// </summary>
         private DataType dataType = DataType.ASCII;
 
@@ -75,8 +76,8 @@ namespace Zhaobang.FtpServer.Connections
         /// Initializes a new instance of the <see cref="ControlConnection"/> class.
         /// Used by <see cref="FtpServer"/> to create a control connection.
         /// </summary>
-        /// <param name="server">The <see cref="FtpServer"/> that creates the connection</param>
-        /// <param name="tcpClient">The TCP client of the connection</param>
+        /// <param name="server">The <see cref="FtpServer"/> that creates the connection.</param>
+        /// <param name="tcpClient">The TCP client of the connection.</param>
         internal ControlConnection(FtpServer server, TcpClient tcpClient)
         {
             this.server = server;
@@ -98,18 +99,18 @@ namespace Zhaobang.FtpServer.Connections
         private enum ListFormat
         {
             Unix,
-            MsDos
+            MsDos,
         }
 
         private enum TransmissionMode
         {
-            Stream
+            Stream,
         }
 
         private enum DataType
         {
             ASCII,
-            IMAGE
+            IMAGE,
         }
 
         private enum DataConnectionMode
@@ -117,11 +118,11 @@ namespace Zhaobang.FtpServer.Connections
             Passive,
             Active,
             ExtendedPassive,
-            ExtendedActive
+            ExtendedActive,
         }
 
         /// <summary>
-        /// Defined in page 40 in RFC 959
+        /// Defined in page 40 in RFC 959.
         /// </summary>
         private enum FtpReplyCode
         {
@@ -150,11 +151,11 @@ namespace Zhaobang.FtpServer.Connections
             NameSystemType = 215,
             FileActionPendingInfo = 350,
             NotSupportedProtocal = 522,
-            ProceedWithNegotiation = 234
+            ProceedWithNegotiation = 234,
         }
 
         /// <summary>
-        /// Dispose of all the connections
+        /// Dispose of all the connections.
         /// </summary>
         public void Dispose()
         {
@@ -165,9 +166,9 @@ namespace Zhaobang.FtpServer.Connections
         /// <summary>
         /// Starts the control connection.
         /// </summary>
-        /// <remarks>Can only be used once</remarks>
-        /// <param name="cancellationToken">Token to terminate the control connection</param>
-        /// <returns>The task that finishes when control connection is closed</returns>
+        /// <remarks>Can only be used once.</remarks>
+        /// <param name="cancellationToken">Token to terminate the control connection.</param>
+        /// <returns>The task that finishes when control connection is closed.</returns>
         public async Task RunAsync(CancellationToken cancellationToken)
         {
             server.Tracer.TraceUserConnection(remoteEndPoint);
@@ -275,7 +276,7 @@ namespace Zhaobang.FtpServer.Connections
                     await ReplyMultilineAsync(FtpReplyCode.SystemStatus, "Supports:\nUTF8");
                     return;
                 case "OPTS":
-                    if (parameter.ToUpper() == "UTF8 ON")
+                    if (parameter.ToLowerInvariant() == "UTF8 ON")
                     {
                         encoding = Encoding.UTF8;
                         await ReplyAsync(FtpReplyCode.CommandOkay, "UTF-8 is on");
@@ -334,16 +335,17 @@ namespace Zhaobang.FtpServer.Connections
                             return;
                     }
                 case "MODE":
-                    switch (parameter)
+                    if (parameter == "S")
                     {
-                        case "S":
-                            transmissionMode = TransmissionMode.Stream;
-                            await ReplyAsync(FtpReplyCode.CommandOkay, "In stream mode");
-                            return;
-                        default:
-                            await ReplyAsync(FtpReplyCode.ParameterNotImplemented, "Unknown mode");
-                            return;
+                        transmissionMode = TransmissionMode.Stream;
+                        await ReplyAsync(FtpReplyCode.CommandOkay, "In stream mode");
                     }
+                    else
+                    {
+                        await ReplyAsync(FtpReplyCode.ParameterNotImplemented, "Unknown mode");
+                    }
+
+                    return;
                 case "QUIT":
                     if (server.ControlConnectionSslFactory != null)
                     {
@@ -729,7 +731,7 @@ namespace Zhaobang.FtpServer.Connections
                 remoteIP = IPAddress.Parse(paramSegs[2]);
                 remotePort = int.Parse(paramSegs[3]);
             }
-            catch(Exception)
+            catch (Exception)
             {
                 await ReplyAsync(
                     FtpReplyCode.SyntaxErrorInParametersOrArguments,
@@ -745,14 +747,14 @@ namespace Zhaobang.FtpServer.Connections
             {
                 await dataConnection.ConnectActiveAsync(userActiveIP, userActiveDataPort, userActiveProtocal);
             }
-            catch(NotSupportedException)
+            catch (NotSupportedException)
             {
                 var supportedProtocalString =
                     string.Join(",", dataConnection.SupportedActiveProtocal.Select(x => x.ToString()));
                 await ReplyAsync(FtpReplyCode.NotSupportedProtocal, $"Protocal not supported, use({supportedProtocalString})");
                 return;
-
             }
+
             await ReplyAsync(FtpReplyCode.CommandOkay, "Data connection established");
         }
 
@@ -771,12 +773,12 @@ namespace Zhaobang.FtpServer.Connections
                     port = dataConnection.ExtendedListen(protocal);
                 }
             }
-            catch(FormatException)
+            catch (FormatException)
             {
                 await ReplyAsync(FtpReplyCode.SyntaxErrorInParametersOrArguments, "Protocal ID incorrect.");
                 return;
             }
-            catch(NotSupportedException)
+            catch (NotSupportedException)
             {
                 var supportedProtocalString =
                     string.Join(",", dataConnection.SupportedPassiveProtocal.Select(x => x.ToString()));
@@ -817,9 +819,9 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
-        /// Reads a line from network stream partitioned by CRLF
+        /// Reads a line from network stream partitioned by CRLF.
         /// </summary>
-        /// <returns>The line read with CRLF trimmed</returns>
+        /// <returns>The line read with CRLF trimmed.</returns>
         private async Task<string> ReadLineAsync()
         {
             var decoder = encoding.GetDecoder();
