@@ -8,13 +8,17 @@
     <Description>A package for hosting an FTP server, with authenticating and file managing customizable. Go to project site for usage example or executable version.</Description>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <Company>Zhaobang China</Company>
-    <PackageProjectUrl>https://github.com/ZhaobangChina/FtpServer/tree/master/Library</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/taoyouh/FtpServer/tree/master/Library</PackageProjectUrl>
     <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
-    <Version>2.0.1</Version>
+    <Version>2.1.0</Version>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <AssemblyName>Zhaobang.FtpServer</AssemblyName>
-    <PackageLicenseUrl>https://github.com/ZhaobangChina/FtpServer/blob/master/LICENSE</PackageLicenseUrl>
-    <PackageReleaseNotes>2.0.0:
+    <PackageLicenseUrl></PackageLicenseUrl>
+    <PackageReleaseNotes>2.1.0:
+Supports FTP over TLS (requires implementing interfaces except on .NET Standard 2.1).
+Supports tracing user activities.
+
+2.0.0:
 Add extensibility for supporting more protocals
 Add support of IPv6
 Support LIST command for a file
@@ -22,8 +26,9 @@ Structure in 1.0.0 are changed for better extensibility
 Bug fix</PackageReleaseNotes>
     <PackageTags>FTP</PackageTags>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <AssemblyVersion>2.0.1.0</AssemblyVersion>
-    <FileVersion>2.0.1.0</FileVersion>
+    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+    <FileVersion>2.1.0.0</FileVersion>
+    <PackageLicenseExpression>https://github.com/taoyouh/FtpServer/blob/master/LICENSE</PackageLicenseExpression>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
