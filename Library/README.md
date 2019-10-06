@@ -40,7 +40,7 @@ Implement `Zhaobang.FtpServer.Connections.IDataConnectionFactory` to use custom 
 
 Implement `Zhaobang.FtpServer.Authenticate.IAuthenticator` to use custom authentication. The default one is `AnonymousAuthenticator`, which only allows anonymous logins.
 
-(Optional) Provide an implementation of `Zhaobang.FtpServer.Connections.IControlConnectionSslFactory` to support TLS on control connection. An implementation class `ControlConnectionSslFactory` is provided on the .NET Standard 2.1 version.
+(Optional) (since version 2.1.0) Provide an implementation of `Zhaobang.FtpServer.Connections.IControlConnectionSslFactory` to support TLS on control connection. An implementation class `ControlConnectionSslFactory` is provided on the .NET Standard 2.1 version.
 
 Use the following to start your customized server:
 ```
@@ -54,7 +54,7 @@ var server = new FtpServer(
 // the remaining is same as simple use
 ```
 
-## FTP over TLS support
+## FTP over TLS support (since version 2.1.0)
 TLS on data connection is enabled when `IDataConnection` instances created by `IDataConnectionDataFactory` instance implement interface `ISslDataConnection`.
 
 TLS on control connection is enabled when an instance of `IControlConnectionSslFactory` is passed to the constructor of `FtpServer`.
