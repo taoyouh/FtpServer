@@ -231,7 +231,7 @@ namespace Zhaobang.FtpServer.Connections
             {
                 ((IDisposable)TcpClient).Dispose();
             }
-            tcpListener.Stop();
+            tcpListener?.Stop();
         }
 
         /// <summary>
