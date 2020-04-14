@@ -10,11 +10,14 @@
     <Company>Zhaobang China</Company>
     <PackageProjectUrl>https://github.com/taoyouh/FtpServer/tree/master/Library</PackageProjectUrl>
     <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
-    <Version>2.1.0</Version>
+    <Version>2.1.1</Version>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <AssemblyName>Zhaobang.FtpServer</AssemblyName>
     <PackageLicenseUrl></PackageLicenseUrl>
-    <PackageReleaseNotes>2.1.0:
+    <PackageReleaseNotes>2.1.1:
+Fixed the error of handling client quitting.
+
+2.1.0:
 Supports FTP over TLS (requires implementing interfaces except on .NET Standard 2.1).
 Supports tracing user activities.
 
