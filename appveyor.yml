@@ -1,4 +1,4 @@
-version: 2.1.0-build{build}
+version: 2.1.2-build{build}
 pull_requests:
   do_not_increment_build_number: true
 branches:
@@ -11,9 +11,9 @@ dotnet_csproj:
   file: '**\*.csproj'
   version: '{version}'
   package_version: '{version}'
-  assembly_version: 2.1.0.{build}
-  file_version: 2.1.0.{build}
-  informational_version: 2.1.0.{build}
+  assembly_version: 2.1.2.{build}
+  file_version: 2.1.2.{build}
+  informational_version: 2.1.2.{build}
 cache: '%USERPROFILE%\.nuget\packages -> **\*.csproj'
 before_build:
 - ps: msbuild /t:restore /verbosity:minimal /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"

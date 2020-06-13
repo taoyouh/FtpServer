@@ -10,11 +10,14 @@
     <Company>Zhaobang China</Company>
     <PackageProjectUrl>https://github.com/taoyouh/FtpServer/tree/master/Library</PackageProjectUrl>
     <Copyright>Copyright (c) Zhaoquan Huang. All rights reserved</Copyright>
-    <Version>2.1.1</Version>
+    <Version>2.1.2</Version>
     <RootNamespace>Zhaobang.FtpServer</RootNamespace>
     <AssemblyName>Zhaobang.FtpServer</AssemblyName>
     <PackageLicenseUrl></PackageLicenseUrl>
-    <PackageReleaseNotes>2.1.1:
+    <PackageReleaseNotes>2.1.2:
+Fixed the error of handling encoding (command "opts utf8 on")
+
+2.1.1:
 Fixed the error of handling client quitting.
 
 2.1.0:
@@ -29,8 +32,8 @@ Structure in 1.0.0 are changed for better extensibility
 Bug fix</PackageReleaseNotes>
     <PackageTags>FTP server</PackageTags>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <AssemblyVersion>2.1.1.0</AssemblyVersion>
-    <FileVersion>2.1.1.0</FileVersion>
+    <AssemblyVersion>2.1.2.0</AssemblyVersion>
+    <FileVersion>2.1.2.0</FileVersion>
     <PackageLicenseExpression></PackageLicenseExpression>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <RepositoryUrl>https://github.com/taoyouh/FtpServer.git</RepositoryUrl>
