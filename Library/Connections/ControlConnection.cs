@@ -276,13 +276,13 @@ namespace Zhaobang.FtpServer.Connections
                     await ReplyMultilineAsync(FtpReplyCode.SystemStatus, "Supports:\nUTF8");
                     return;
                 case "OPTS":
-                    if (parameter.ToLowerInvariant() == "UTF8 ON")
+                    if (parameter.ToUpperInvariant() == "UTF8 ON")
                     {
                         encoding = Encoding.UTF8;
                         await ReplyAsync(FtpReplyCode.CommandOkay, "UTF-8 is on");
                         return;
                     }
-                    else if (parameter.ToUpper() == "UTF8 OFF")
+                    else if (parameter.ToUpperInvariant() == "UTF8 OFF")
                     {
                         encoding = Encoding.ASCII;
                         await ReplyAsync(FtpReplyCode.CommandOkay, "UTF-8 is off");
