@@ -452,6 +452,13 @@ namespace Zhaobang.FtpServer.Connections
             MemoryStream stream = new MemoryStream();
             var writer = new StreamWriter(stream, encoding);
             writer.NewLine = "\r\n";
+
+            // Windows Explorer changes working directory and lists the current directory, and the parameter is always empty.
+            // Some FTP clients (such as Material Files) adds a "-a" flag before the path, but does not escape spaces in the path like we do in a shell.
+            if (parameter.StartsWith("-a "))
+            {
+                parameter = parameter.Substring(3);
+            }
             try
             {
                 var listing = await fileProvider.GetListingAsync(parameter);
