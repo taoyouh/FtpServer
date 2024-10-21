@@ -235,6 +235,7 @@ namespace Zhaobang.FtpServer.Connections
                     await fileProvider.DeleteAsync(parameter);
                     await ReplyAsync(FtpReplyCode.FileActionOk, "Delete succeeded");
                     return;
+                case "XRMD":
                 case "RMD":
                     if (!authenticated)
                     {
@@ -244,6 +245,7 @@ namespace Zhaobang.FtpServer.Connections
                     await fileProvider.DeleteDirectoryAsync(parameter);
                     await ReplyAsync(FtpReplyCode.FileActionOk, "Directory deleted");
                     return;
+                case "XMKD":
                 case "MKD":
                     if (!authenticated)
                     {
@@ -257,6 +259,7 @@ namespace Zhaobang.FtpServer.Connections
                             "\"{0}\"",
                             fileProvider.GetWorkingDirectory().Replace("\"", "\"\"")));
                     return;
+                case "XPWD":
                 case "PWD":
                     if (!authenticated)
                     {
