@@ -14,6 +14,7 @@ using System.Xml.Serialization;
 using Zhaobang.FtpServer.Authenticate;
 using Zhaobang.FtpServer.Connections;
 using Zhaobang.FtpServer.File;
+using Zhaobang.FtpServer.Options;
 
 namespace Zhaobang.FtpServer
 {
@@ -56,6 +57,13 @@ namespace Zhaobang.FtpServer
                 }
             }
 
+            var ftpServerOptions = new FtpServerOptions
+            {
+                PassiveIp = config.PassiveIp,
+                PassiveMinPort = config.PassiveMinPort,
+                PassiveMaxPort = config.PassiveMaxPort,
+            };
+
             X509Certificate certificate = null;
             try
             {
@@ -72,10 +80,10 @@ namespace Zhaobang.FtpServer
                         var fileProviderFactory = new SimpleFileProviderFactory(config.BaseDirectory);
                         var dataConnectionFactory =
                             certificate == null ? new LocalDataConnectionFactory() : (IDataConnectionFactory)new SslLocalDataConnectionFactory(certificate);
-                        var authenticator = new AnonymousAuthenticator();
+                        var authenticator = new HybridAuthenticator(config.FtpUsers, config.EnableAnonymous);
                         var controlConnectionSslFactory =
                             certificate == null ? null : new ControlConnectionSslFactory(certificate);
-                        var server = new FtpServer(ep, fileProviderFactory, dataConnectionFactory, authenticator, controlConnectionSslFactory);
+                        var server = new FtpServer(ep, fileProviderFactory, dataConnectionFactory, authenticator, controlConnectionSslFactory, ftpServerOptions);
 
                         servers.Add(server);
                         return server.RunAsync(cancelSource.Token)

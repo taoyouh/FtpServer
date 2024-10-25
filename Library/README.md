@@ -49,7 +49,8 @@ var server = new FtpServer(
     new MyFileProviderFactory(),
     new MyDataConnectionFactory(),
     new MyAuthenticator(),
-    new MyControlConnectionSslFactory()
+    new MyControlConnectionSslFactory(),
+    new FtpServerOptions()
 );
 // the remaining is same as simple use
 ```
@@ -65,7 +66,7 @@ var fileProviderFactory = new SimpleFileProviderFactory(config.BaseDirectory);
 var dataConnectionFactory = new SslLocalDataConnectionFactory(certificate);
 var authenticator = new AnonymousAuthenticator();
 var controlConnectionSslFactory = new ControlConnectionSslFactory(certificate);
-var server = new FtpServer(ep, fileProviderFactory, dataConnectionFactory, authenticator, controlConnectionSslFactory);
+var server = new FtpServer(ep, fileProviderFactory, dataConnectionFactory, authenticator, controlConnectionSslFactory, new FtpServerOptions());
 ```
 
 The .NET Standard 1.4 version requires your own implementation of those classes. You can refer to the source code for a sample implementation.

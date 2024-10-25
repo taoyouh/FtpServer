@@ -18,9 +18,12 @@ namespace Zhaobang.FtpServer.Connections
     /// </summary>
     public class LocalDataConnection : IDisposable, IDataConnection
     {
-        private const int MinPort = 1024;
-        private const int MaxPort = 65535;
-        private static int lastUsedPort = new Random().Next(MinPort, MaxPort);
+#pragma warning disable SA1306 // Field names should begin with lower-case letter
+        private static int MinPort = 1024;
+        private static int MaxPort = 65535;
+#pragma warning restore SA1306 // Field names should begin with lower-case letter
+        private static object portLock = new object();
+        private static int lastUsedPort = 0; // new Random().Next(MinPort, MaxPort);
 
         private readonly IPAddress listeningIP;
 
@@ -39,8 +42,18 @@ namespace Zhaobang.FtpServer.Connections
         /// NO connection will be initiated immediately.
         /// </summary>
         /// <param name="localIP">The IP which was connected by the user.</param>
-        public LocalDataConnection(IPAddress localIP)
+        /// <param name="minPort">The min port in PASSIVE mode.</param>
+        /// <param name="maxPort">The max port in PASSIVE mode.</param>
+        public LocalDataConnection(IPAddress localIP, int minPort, int maxPort)
         {
+            MinPort = minPort;
+            MaxPort = maxPort;
+            if (lastUsedPort == 0)
+            {
+                lock (portLock)
+                    if (lastUsedPort == 0)
+                        lastUsedPort = new Random().Next(MinPort, MaxPort);
+            }
             listeningIP = localIP;
         }
 

@@ -21,10 +21,12 @@ namespace Zhaobang.FtpServer.Connections
         /// Gets <see cref="LocalDataConnection"/> for a user.
         /// </summary>
         /// <param name="localIP">The IP which was connected by the user.</param>
+        /// <param name="minPort">The min port in PASSIVE mode.</param>
+        /// <param name="maxPort">The max port in PASSIVE mode.</param>
         /// <returns>The data connection for the user.</returns>
-        public IDataConnection GetDataConnection(IPAddress localIP)
+        public IDataConnection GetDataConnection(IPAddress localIP, int minPort, int maxPort)
         {
-            return new LocalDataConnection(localIP);
+            return new LocalDataConnection(localIP, minPort, maxPort);
         }
     }
 }

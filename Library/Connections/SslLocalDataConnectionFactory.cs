@@ -31,10 +31,12 @@ namespace Zhaobang.FtpServer.Connections
         /// Gets the data connection instance.
         /// </summary>
         /// <param name="localIP">The local IP to bind the socket.</param>
+        /// <param name="minPort">The min port for PASV mode.</param>
+        /// <param name="maxPort">The max port for PASV mode.</param>
         /// <returns>The created data connection instance.</returns>
-        public IDataConnection GetDataConnection(IPAddress localIP)
+        public IDataConnection GetDataConnection(IPAddress localIP, int minPort, int maxPort)
         {
-            return new SslLocalDataConnection(localIP, certificate);
+            return new SslLocalDataConnection(localIP, certificate, minPort, maxPort);
         }
     }
 }
