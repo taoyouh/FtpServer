@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using Zhaobang.FtpServer.Connections;
 using Zhaobang.FtpServer.Exceptions;
 using Zhaobang.FtpServer.File;
+using Zhaobang.FtpServer.Options;
 
 namespace Zhaobang.FtpServer.Connections
 {
@@ -30,6 +31,7 @@ namespace Zhaobang.FtpServer.Connections
 
         private readonly IPEndPoint remoteEndPoint;
         private readonly IPEndPoint localEndPoint;
+        private readonly FtpServerOptions ftpServerOptions;
 
         /// <summary>
         /// This should be available all time, but needs to check
@@ -78,7 +80,8 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="server">The <see cref="FtpServer"/> that creates the connection.</param>
         /// <param name="tcpClient">The TCP client of the connection.</param>
-        internal ControlConnection(FtpServer server, TcpClient tcpClient)
+        /// <param name="ftpServerOptions">The ftp options.</param>
+        internal ControlConnection(FtpServer server, TcpClient tcpClient, FtpServerOptions ftpServerOptions)
         {
             this.server = server;
             this.tcpClient = tcpClient;
@@ -90,8 +93,8 @@ namespace Zhaobang.FtpServer.Connections
 
             var localUri = new Uri("ftp://" + this.tcpClient.Client.LocalEndPoint.ToString());
             localEndPoint = new IPEndPoint(IPAddress.Parse(localUri.Host), localUri.Port);
-
-            dataConnection = server.DataConnector.GetDataConnection(localEndPoint.Address);
+            this.ftpServerOptions = ftpServerOptions;
+            dataConnection = server.DataConnector.GetDataConnection(localEndPoint.Address, ftpServerOptions.PassiveMinPort, ftpServerOptions.PassiveMaxPort);
 
             stream = this.tcpClient.GetStream();
         }
@@ -657,7 +660,11 @@ namespace Zhaobang.FtpServer.Connections
         private async Task CommandPasvAsync()
         {
             var localEP = dataConnection.Listen();
-            var ipBytes = localEP.Address.GetAddressBytes();
+
+            // var ipBytes = localEP.Address.GetAddressBytes();
+            var passiveIpValid = IPAddress.TryParse(ftpServerOptions.PassiveIp, out var pasvIP);
+            if (!passiveIpValid) pasvIP = localEP.Address;
+            var ipBytes = pasvIP.GetAddressBytes();
             if (ipBytes.Length != 4) throw new Exception();
             var passiveEPString =
                 string.Format(

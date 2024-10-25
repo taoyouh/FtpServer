@@ -20,8 +20,10 @@ namespace Zhaobang.FtpServer.Connections
     /// </summary>
     public class SslLocalDataConnection : IDisposable, IDataConnection, ISslDataConnection
     {
-        private const int MinPort = 1024;
-        private const int MaxPort = 65535;
+#pragma warning disable SA1306 // Field names should begin with lower-case letter
+        private static int MinPort = 1024;
+        private static int MaxPort = 65535;
+#pragma warning restore SA1306 // Field names should begin with lower-case letter
         private static int lastUsedPort = new Random().Next(MinPort, MaxPort);
 
         private readonly IPAddress listeningIP;
@@ -43,8 +45,12 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="localIP">The IP which was connected by the user.</param>
         /// <param name="certificate">The certificate to upgrade to encrypted stream.</param>
-        public SslLocalDataConnection(IPAddress localIP, X509Certificate certificate)
+        /// <param name="minPort">The min port for PASV mode.</param>
+        /// <param name="maxPort">The max port for PASV mode.</param>
+        public SslLocalDataConnection(IPAddress localIP, X509Certificate certificate, int minPort, int maxPort)
         {
+            MinPort = minPort;
+            MaxPort = maxPort;
             listeningIP = localIP;
             this.certificate = certificate ?? throw new ArgumentNullException(nameof(certificate));
         }

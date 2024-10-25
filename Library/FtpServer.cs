@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using Zhaobang.FtpServer.Authenticate;
 using Zhaobang.FtpServer.Connections;
 using Zhaobang.FtpServer.File;
+using Zhaobang.FtpServer.Options;
 using Zhaobang.FtpServer.Trace;
 
 namespace Zhaobang.FtpServer
@@ -28,6 +29,8 @@ namespace Zhaobang.FtpServer
         private readonly IFileProviderFactory fileProviderFactory;
         private readonly IControlConnectionSslFactory controlConnectionSslFactory;
         private readonly FtpTracer tracer = new FtpTracer();
+
+        private readonly FtpServerOptions ftpServerOptions;
 
         private IPEndPoint endPoint;
         private TcpListener tcpListener;
@@ -57,7 +60,7 @@ namespace Zhaobang.FtpServer
             IFileProviderFactory fileProviderFactory,
             IDataConnectionFactory dataConnFactory,
             IAuthenticator authenticator)
-            : this(endPoint, fileProviderFactory, dataConnFactory, authenticator, null)
+            : this(endPoint, fileProviderFactory, dataConnFactory, authenticator, null, new FtpServerOptions())
         {
         }
 
@@ -70,12 +73,14 @@ namespace Zhaobang.FtpServer
         /// <param name="dataConnFactory">The <see cref="IDataConnectionFactory"/> to use.</param>
         /// <param name="authenticator">The <see cref="IAuthenticator"/> to use.</param>
         /// <param name="controlConnectionSslFactory">The <see cref="IControlConnectionSslFactory"/> to upgrade control connection to SSL.</param>
+        /// <param name="ftpServerOptions">The <see cref="FtpServerOptions"/> set ftp options.</param>
         public FtpServer(
             IPEndPoint endPoint,
             IFileProviderFactory fileProviderFactory,
             IDataConnectionFactory dataConnFactory,
             IAuthenticator authenticator,
-            IControlConnectionSslFactory controlConnectionSslFactory)
+            IControlConnectionSslFactory controlConnectionSslFactory,
+            FtpServerOptions ftpServerOptions)
         {
             this.endPoint = endPoint;
             tcpListener = new TcpListener(endPoint);
@@ -84,6 +89,8 @@ namespace Zhaobang.FtpServer
             this.dataConnFactory = dataConnFactory;
             this.authenticator = authenticator;
             this.controlConnectionSslFactory = controlConnectionSslFactory;
+
+            this.ftpServerOptions = ftpServerOptions;
 
             tracer.CommandInvoked += Tracer_CommandInvoked;
             tracer.ReplyInvoked += Tracer_ReplyInvoked;
@@ -139,7 +146,7 @@ namespace Zhaobang.FtpServer
 
                     try
                     {
-                        ControlConnection handler = new ControlConnection(this, tcpClient);
+                        ControlConnection handler = new ControlConnection(this, tcpClient, ftpServerOptions);
                         var result = handler.RunAsync(cancellationToken);
                     }
                     catch (Exception)

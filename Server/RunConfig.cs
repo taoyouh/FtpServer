@@ -8,6 +8,7 @@ using System.Net;
 using System.Security;
 using System.Text;
 using System.Xml.Serialization;
+using Zhaobang.FtpServer.Authenticate;
 
 namespace Zhaobang.FtpServer
 {
@@ -34,6 +35,11 @@ namespace Zhaobang.FtpServer
                     Address = IPAddress.IPv6Any,
                     Port = 21,
                 });
+                config.FtpUsers.Add(new FtpUser
+                {
+                    Name = "user",
+                    Password = "password",
+                });
                 return config;
             }
         }
@@ -57,6 +63,25 @@ namespace Zhaobang.FtpServer
         /// Gets or sets the password of the PKCS7 certificate file if TLS is enabled.
         /// </summary>
         public string CertificatePassword { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the min port of the FTP file system in passive mode.
+        /// </summary>
+        public string PassiveIp { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the min port of the FTP file system in passive mode.
+        /// </summary>
+        public int PassiveMinPort { get; set; } = 1024;
+
+        /// <summary>
+        /// Gets or sets the max port of the FTP file system in passive mode.
+        /// </summary>
+        public int PassiveMaxPort { get; set; } = 65535;
+
+        public bool EnableAnonymous { get; set; } = false;
+
+        public List<FtpUser> FtpUsers { get; set; } = new List<FtpUser>();
 
         /// <summary>
         /// An end point to listen on.
