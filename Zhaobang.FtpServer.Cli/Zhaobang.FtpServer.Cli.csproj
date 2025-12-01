@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Library\Library.csproj" />
+    <ProjectReference Include="..\Zhaobang.FtpServer\Zhaobang.FtpServer.csproj" />
   </ItemGroup>
 
 </Project>
