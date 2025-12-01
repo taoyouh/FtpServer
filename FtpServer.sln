@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Zhaobang.FtpServer", "Zhaob
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Zhaobang.FtpServer.Cli", "Zhaobang.FtpServer.Cli\Zhaobang.FtpServer.Cli.csproj", "{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zhaobang.FtpServer.Tests", "Zhaobang.FtpServer.Tests\Zhaobang.FtpServer.Tests.csproj", "{B0370685-136F-40AC-A66B-8ED6A57FFB26}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0370685-136F-40AC-A66B-8ED6A57FFB26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0370685-136F-40AC-A66B-8ED6A57FFB26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0370685-136F-40AC-A66B-8ED6A57FFB26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0370685-136F-40AC-A66B-8ED6A57FFB26}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
