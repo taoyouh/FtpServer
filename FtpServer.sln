@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29324.140
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36717.8
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Library", "Library\Library.csproj", "{238C85C3-7AA9-4548-BB0D-54F084EB7524}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Zhaobang.FtpServer", "Zhaobang.FtpServer\Zhaobang.FtpServer.csproj", "{238C85C3-7AA9-4548-BB0D-54F084EB7524}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Server", "Server\Server.csproj", "{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Zhaobang.FtpServer.Cli", "Zhaobang.FtpServer.Cli\Zhaobang.FtpServer.Cli.csproj", "{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zhaobang.FtpServer.Tests", "Zhaobang.FtpServer.Tests\Zhaobang.FtpServer.Tests.csproj", "{B0370685-136F-40AC-A66B-8ED6A57FFB26}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F3A4B333-DF5C-4963-BC9E-771F1A3C5965}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0370685-136F-40AC-A66B-8ED6A57FFB26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0370685-136F-40AC-A66B-8ED6A57FFB26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0370685-136F-40AC-A66B-8ED6A57FFB26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0370685-136F-40AC-A66B-8ED6A57FFB26}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
