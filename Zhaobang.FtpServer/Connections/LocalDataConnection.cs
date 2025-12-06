@@ -18,20 +18,10 @@ namespace Zhaobang.FtpServer.Connections
     /// </summary>
     public class LocalDataConnection : IDisposable, IDataConnection
     {
-        private const int MinPort = 1024;
-        private const int MaxPort = 65535;
-        private static int lastUsedPort = new Random().Next(MinPort, MaxPort);
-
         private readonly IPAddress listeningIP;
 
-        private TcpClient tcpClient;
-
-        /// <summary>
-        /// The port number used in passive mode.
-        /// If changed to active mode, set to -1.
-        /// </summary>
-        private int listeningPort;
-        private TcpListener tcpListener;
+        [Obsolete("Use property instead.")]
+        private ITcpConnection tcpConnection;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LocalDataConnection"/> class.
@@ -49,7 +39,10 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         public bool IsOpen
         {
-            get { return TcpClient != null && TcpClient.Connected; }
+            get
+            {
+                return this.TcpConnection?.Stream != null;
+            }
         }
 
         /// <summary>
@@ -79,21 +72,23 @@ namespace Zhaobang.FtpServer.Connections
             get => new int[] { 1, 2 };
         }
 
-        private TcpClient TcpClient
+        private ITcpConnection TcpConnection
         {
-            get => tcpClient;
+#pragma warning disable CS0618
+            get => this.tcpConnection;
             set
             {
+                if (this.tcpConnection != value)
                 {
-                    if (tcpClient != null)
+                    if (this.tcpConnection != null)
                     {
-                        tcpClient.Dispose();
-                        listeningPort = -1;
+                        this.tcpConnection.Dispose();
                     }
-                    if (tcpClient != value)
-                        tcpClient = value;
+
+                    this.tcpConnection = value;
                 }
             }
+#pragma warning restore CS0618
         }
 
         /// <summary>
@@ -117,9 +112,10 @@ namespace Zhaobang.FtpServer.Connections
                 default:
                     throw new NotSupportedException();
             }
-            listeningPort = -1;
-            TcpClient = new TcpClient(addressFamily);
-            await TcpClient.ConnectAsync(remoteIP, remotePort);
+            TcpConnection = null;
+            var tcpClient = new TcpClient(addressFamily);
+            await tcpClient.ConnectAsync(remoteIP, remotePort);
+            this.TcpConnection = new ActiveTcpConnection(tcpClient);
         }
 
         /// <summary>
@@ -128,40 +124,18 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The end point listening at.</returns>
         public IPEndPoint Listen()
         {
-            if (tcpListener != null)
+            try
             {
-                try
-                {
-                    tcpListener.Start();
-                    return new IPEndPoint(listeningIP, listeningPort);
-                }
-                catch
-                {
-                    // If can't start the listener, proceed below to create a new one.
-                }
+                // Open new connection before stopping pervious listener.
+                var newConnection = new PassiveTcpConnection(listeningIP);
+                this.TcpConnection = newConnection;
+                return newConnection.ListenEndPoint;
             }
-            int port = lastUsedPort + 1;
-            int startPort = lastUsedPort + 1;
-            do
+            catch (Exception)
             {
-                if (port > MaxPort)
-                    port = MinPort;
-                try
-                {
-                    listeningPort = port;
-                    var listeningEP = new IPEndPoint(listeningIP, listeningPort);
-                    tcpListener = new TcpListener(listeningEP);
-                    tcpListener.Start();
-                    lastUsedPort = port;
-                    return listeningEP;
-                }
-                catch
-                {
-                    port++;
-                }
+                this.TcpConnection = null;
+                throw;
             }
-            while (port != startPort);
-            throw new Exception("There are no ports available");
         }
 
         /// <summary>
@@ -181,22 +155,26 @@ namespace Zhaobang.FtpServer.Connections
         /// Accepts a FTP passive mode connection.
         /// </summary>
         /// <returns>The task to await.</returns>
+        /// <exception cref="InvalidOperationException">Not listening for incoming connection.</exception>
+        /// <exception cref="OperationCanceledException">The current listener is closed before any incoming connection.</exception>
         public async Task AcceptAsync()
         {
-            tcpClient = await tcpListener.AcceptTcpClientAsync();
-            tcpListener.Stop();
-            tcpListener = null;
+            if (this.TcpConnection == null)
+            {
+                throw new InvalidOperationException("Not listening for incoming connection.");
+            }
+
+            await this.TcpConnection.WaitForClientAsync();
         }
 
         /// <summary>
         /// Disconnects any open connection.
         /// </summary>
         /// <returns>The task to await.</returns>
-#pragma warning disable CS1998
-        public async Task DisconnectAsync()
-#pragma warning restore CS1998
+        public Task DisconnectAsync()
         {
-            TcpClient = null;
+            TcpConnection = null;
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -206,7 +184,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The task to await.</returns>
         public async Task SendAsync(Stream streamToRead)
         {
-            var stream = tcpClient.GetStream();
+            NetworkStream stream = this.TcpConnection.Stream;
             await streamToRead.CopyToAsync(stream);
             await stream.FlushAsync();
         }
@@ -218,7 +196,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The task to await.</returns>
         public async Task RecieveAsync(Stream streamToWrite)
         {
-            var stream = tcpClient.GetStream();
+            NetworkStream stream = this.TcpConnection.Stream;
             await stream.CopyToAsync(streamToWrite);
         }
 
@@ -227,11 +205,7 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         public void Close()
         {
-            if (TcpClient != null)
-            {
-                ((IDisposable)TcpClient).Dispose();
-            }
-            tcpListener?.Stop();
+            TcpConnection = null;
         }
 
         /// <summary>

@@ -11,7 +11,6 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Zhaobang.FtpServer.Connections;
 using Zhaobang.FtpServer.Exceptions;
 using Zhaobang.FtpServer.File;
 
@@ -25,11 +24,12 @@ namespace Zhaobang.FtpServer.Connections
         private const int ReadByteBufferLength = 12;
         private const int ReadCharBufferLength = 12;
 
-        private readonly FtpServer server;
-        private readonly TcpClient tcpClient;
+        private readonly IControlConnectionHost host;
 
         private readonly IPEndPoint remoteEndPoint;
         private readonly IPEndPoint localEndPoint;
+
+        private readonly Encoding utf8Encoding = new UTF8Encoding(false);
 
         /// <summary>
         /// This should be available all time, but needs to check
@@ -39,7 +39,7 @@ namespace Zhaobang.FtpServer.Connections
 
         private Stream stream;
 
-        private Encoding encoding = Encoding.UTF8;
+        private Encoding encoding;
         private string userName = string.Empty;
         private bool authenticated;
 
@@ -73,27 +73,25 @@ namespace Zhaobang.FtpServer.Connections
         private bool useSecureDataConnection = false;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ControlConnection"/> class.
-        /// Used by <see cref="FtpServer"/> to create a control connection.
+        /// Initializes a new instance of the <see cref="ControlConnection"/> class to handle the FTP control connection.
         /// </summary>
-        /// <param name="server">The <see cref="FtpServer"/> that creates the connection.</param>
-        /// <param name="tcpClient">The TCP client of the connection.</param>
-        internal ControlConnection(FtpServer server, TcpClient tcpClient)
+        /// <param name="host">The <see cref="IControlConnectionHost"/> that creates the connection.</param>
+        /// <param name="stream">The TCP stream of the connection.</param>
+        /// <param name="remoteEndPoint">The IP end point of the client.</param>
+        /// <param name="localEndPoint">The IP end point of the server.</param>
+        /// <exception cref="ArgumentNullException">The argument passed in is null.</exception>
+        internal ControlConnection(IControlConnectionHost host, Stream stream, IPEndPoint remoteEndPoint, IPEndPoint localEndPoint)
         {
-            this.server = server;
-            this.tcpClient = tcpClient;
+            this.host = host ?? throw new ArgumentNullException(nameof(host));
 
-            var remoteUri = new Uri("ftp://" + this.tcpClient.Client.RemoteEndPoint.ToString());
-            remoteEndPoint = new IPEndPoint(IPAddress.Parse(remoteUri.Host), remoteUri.Port);
-            userActiveDataPort = remoteEndPoint.Port;
-            userActiveIP = remoteEndPoint.Address;
+            this.remoteEndPoint = remoteEndPoint ?? throw new ArgumentNullException(nameof(remoteEndPoint));
+            this.localEndPoint = localEndPoint ?? throw new ArgumentNullException(nameof(localEndPoint));
 
-            var localUri = new Uri("ftp://" + this.tcpClient.Client.LocalEndPoint.ToString());
-            localEndPoint = new IPEndPoint(IPAddress.Parse(localUri.Host), localUri.Port);
+            dataConnection = host.DataConnector.GetDataConnection(localEndPoint.Address);
 
-            dataConnection = server.DataConnector.GetDataConnection(localEndPoint.Address);
+            this.stream = stream ?? throw new ArgumentNullException(nameof(stream));
 
-            stream = this.tcpClient.GetStream();
+            this.encoding = this.utf8Encoding;
         }
 
         private enum ListFormat
@@ -159,7 +157,7 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         public void Dispose()
         {
-            tcpClient.Dispose();
+            stream.Dispose();
             dataConnection.Close();
         }
 
@@ -171,7 +169,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The task that finishes when control connection is closed.</returns>
         public async Task RunAsync(CancellationToken cancellationToken)
         {
-            server.Tracer.TraceUserConnection(remoteEndPoint);
+            host.Tracer.TraceUserConnection(remoteEndPoint);
             try
             {
                 await ReplyAsync(FtpReplyCode.ServiceReady, "FtpServer by Taoyou is now ready");
@@ -197,7 +195,7 @@ namespace Zhaobang.FtpServer.Connections
             finally
             {
                 Dispose();
-                server.Tracer.TraceUserDisconnection(remoteEndPoint);
+                host.Tracer.TraceUserDisconnection(remoteEndPoint);
             }
         }
 
@@ -207,7 +205,7 @@ namespace Zhaobang.FtpServer.Connections
             var command = messageSegs[0];
             var parameter = messageSegs.Length < 2 ? string.Empty : messageSegs[1];
 
-            server.Tracer.TraceCommand(command, remoteEndPoint);
+            host.Tracer.TraceCommand(command, remoteEndPoint);
             switch (command.ToUpper())
             {
                 case "RNFR":
@@ -278,7 +276,7 @@ namespace Zhaobang.FtpServer.Connections
                 case "OPTS":
                     if (parameter.ToUpperInvariant() == "UTF8 ON")
                     {
-                        encoding = Encoding.UTF8;
+                        this.encoding = this.utf8Encoding;
                         await ReplyAsync(FtpReplyCode.CommandOkay, "UTF-8 is on");
                         return;
                     }
@@ -296,10 +294,10 @@ namespace Zhaobang.FtpServer.Connections
                     await ReplyAsync(FtpReplyCode.NeedPassword, "Please input password");
                     return;
                 case "PASS":
-                    if (authenticated = server.Authenticator.Authenticate(userName, parameter))
+                    if (authenticated = host.Authenticator.Authenticate(userName, parameter))
                     {
                         await ReplyAsync(FtpReplyCode.UserLoggedIn, "Logged in");
-                        fileProvider = server.FileManager.GetProvider(userName);
+                        fileProvider = host.FileManager.GetProvider(userName);
                     }
                     else
                     {
@@ -347,9 +345,9 @@ namespace Zhaobang.FtpServer.Connections
 
                     return;
                 case "QUIT":
-                    if (server.ControlConnectionSslFactory != null)
+                    if (host.ControlConnectionSslFactory != null)
                     {
-                        await server.ControlConnectionSslFactory.DisconnectAsync(stream);
+                        await host.ControlConnectionSslFactory.DisconnectAsync(stream);
                     }
                     throw new QuitRequestedException();
                 case "RETR":
@@ -394,13 +392,13 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task CommandAuthAsync(string parameter)
         {
-            if ((parameter != "TLS" && parameter != "SSL") || server.ControlConnectionSslFactory == null)
+            if ((parameter != "TLS" && parameter != "SSL") || host.ControlConnectionSslFactory == null)
             {
                 await ReplyAsync(FtpReplyCode.NotImplemented, "Not supported");
                 return;
             }
             await ReplyAsync(FtpReplyCode.ProceedWithNegotiation, "Authenticating");
-            stream = await server.ControlConnectionSslFactory.UpgradeAsync(stream);
+            stream = await host.ControlConnectionSslFactory.UpgradeAsync(stream);
         }
 
         private async Task CommandProtAsync(string parameter)
@@ -795,7 +793,7 @@ namespace Zhaobang.FtpServer.Connections
             dataConnectionMode = DataConnectionMode.ExtendedPassive;
             await ReplyAsync(
                 FtpReplyCode.EnteringEpsvMode,
-                string.Format("Entering extended passive mode (|||{0}|).", port));
+                string.Format("Entering extended passive mode. (|||{0}|)", port));
         }
 
         private async Task OpenDataConnectionAsync()
@@ -897,7 +895,7 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task ReplyAsync(FtpReplyCode code, string message)
         {
-            server.Tracer.TraceReply(((int)code).ToString(), remoteEndPoint);
+            host.Tracer.TraceReply(((int)code).ToString(), remoteEndPoint);
             StringBuilder stringBuilder = new StringBuilder(6 + message.Length);
             stringBuilder.Append((int)code);
             stringBuilder.Append(' ');
@@ -910,7 +908,7 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task ReplyMultilineAsync(FtpReplyCode code, string message)
         {
-            server.Tracer.TraceReply(((int)code).ToString(), remoteEndPoint);
+            host.Tracer.TraceReply(((int)code).ToString(), remoteEndPoint);
             message = message.Replace("\r", string.Empty);
             message = message.Replace("\n", "\r\n ");
             var stringToSend = string.Format("{0}-{1}\r\n{2} End\r\n", (int)code, message, (int)code);

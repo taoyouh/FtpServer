@@ -21,7 +21,7 @@ namespace Zhaobang.FtpServer
     /// <summary>
     /// The class to run an FTP server.
     /// </summary>
-    public sealed class FtpServer
+    public sealed class FtpServer : IControlConnectionHost
     {
         private readonly IDataConnectionFactory dataConnFactory;
         private readonly IAuthenticator authenticator;
@@ -87,30 +87,20 @@ namespace Zhaobang.FtpServer
             tracer.ReplyInvoked += Tracer_ReplyInvoked;
         }
 
-        /// <summary>
-        /// Gets the instance of <see cref="FtpTracer"/> to trace FTP commands and replies.
-        /// </summary>
+        /// <inheritdoc/>
         public FtpTracer Tracer => tracer;
 
-        /// <summary>
-        /// Gets the manager that provides <see cref="IDataConnectionFactory"/> for each user.
-        /// </summary>
-        internal IDataConnectionFactory DataConnector { get => dataConnFactory; }
+        /// <inheritdoc/>
+        IDataConnectionFactory IControlConnectionHost.DataConnector { get => dataConnFactory; }
 
-        /// <summary>
-        /// Gets the manager that authenticates user.
-        /// </summary>
-        internal IAuthenticator Authenticator { get => authenticator; }
+        /// <inheritdoc/>
+        IAuthenticator IControlConnectionHost.Authenticator { get => authenticator; }
 
-        /// <summary>
-        /// Gets the manager that provides <see cref="IFileProviderFactory"/> for each user.
-        /// </summary>
-        internal IFileProviderFactory FileManager { get => fileProviderFactory; }
+        /// <inheritdoc/>
+        IFileProviderFactory IControlConnectionHost.FileManager { get => fileProviderFactory; }
 
-        /// <summary>
-        /// Gets the factory to upgrade control connection to an encrypted one. May be null.
-        /// </summary>
-        internal IControlConnectionSslFactory ControlConnectionSslFactory => controlConnectionSslFactory;
+        /// <inheritdoc/>
+        IControlConnectionSslFactory IControlConnectionHost.ControlConnectionSslFactory => controlConnectionSslFactory;
 
         /// <summary>
         /// Gets the local end point the server is listening on.
@@ -140,15 +130,25 @@ namespace Zhaobang.FtpServer
                         return;
                     }
 
-                    try
+                    async Task Run()
                     {
-                        ControlConnection handler = new ControlConnection(this, tcpClient);
-                        var result = handler.RunAsync(cancellationToken);
+                        try
+                        {
+                            using (var handler = new ControlConnection(
+                                this,
+                                tcpClient.GetStream(),
+                                tcpClient.Client.RemoteEndPoint as IPEndPoint,
+                                tcpClient.Client.LocalEndPoint as IPEndPoint))
+                            {
+                                await handler.RunAsync(cancellationToken);
+                            }
+                        }
+                        finally
+                        {
+                            tcpClient.Dispose();
+                        }
                     }
-                    catch (Exception)
-                    {
-                        tcpClient.Dispose();
-                    }
+                    _ = Run();
                 }
             }
             finally
