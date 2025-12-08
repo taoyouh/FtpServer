@@ -95,32 +95,14 @@ namespace Zhaobang.FtpServer.Tests
 
         private IPEndPoint StartFtpServer()
         {
-            Random random = new();
-            int attempt = 0;
-            while (true)
-            {
-                IPEndPoint serverEndPoint = new(IPAddress.IPv6Loopback, random.Next(1024, IPEndPoint.MaxPort + 1));
-                this.server = new(
-                    serverEndPoint,
-                    new MockFileProviderFactory(),
-                    new LocalDataConnectionFactory(),
-                    new AnonymousAuthenticator());
-                try
-                {
-                    this.serverRunTask = this.server.RunAsync(this.serverRunCts.Token);
-                }
-                catch (SocketException ex)
-                {
-                    if (ex.SocketErrorCode == SocketError.AddressAlreadyInUse && (attempt++ < 10))
-                    {
-                        continue;
-                    }
-
-                    throw;
-                }
-
-                return serverEndPoint;
-            }
+            IPEndPoint serverEndPoint = new(IPAddress.IPv6Loopback, 0);
+            this.server = new(
+                serverEndPoint,
+                new MockFileProviderFactory(),
+                new LocalDataConnectionFactory(),
+                new AnonymousAuthenticator());
+            this.serverRunTask = this.server.RunAsync(this.serverRunCts.Token);
+            return this.server.EndPoint;
         }
 
         private class MockFileProviderFactory : IFileProviderFactory
