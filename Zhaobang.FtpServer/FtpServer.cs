@@ -29,7 +29,6 @@ namespace Zhaobang.FtpServer
         private readonly IControlConnectionSslFactory controlConnectionSslFactory;
         private readonly FtpTracer tracer = new FtpTracer();
 
-        private IPEndPoint endPoint;
         private TcpListener tcpListener;
 
         /// <summary>
@@ -77,7 +76,6 @@ namespace Zhaobang.FtpServer
             IAuthenticator authenticator,
             IControlConnectionSslFactory controlConnectionSslFactory)
         {
-            this.endPoint = endPoint;
             tcpListener = new TcpListener(endPoint);
 
             this.fileProviderFactory = fileProviderFactory;
@@ -113,6 +111,11 @@ namespace Zhaobang.FtpServer
         /// Gets the factory to upgrade control connection to an encrypted one. May be null.
         /// </summary>
         internal IControlConnectionSslFactory ControlConnectionSslFactory => controlConnectionSslFactory;
+
+        /// <summary>
+        /// Gets the local end point the server is listening on.
+        /// </summary>
+        internal IPEndPoint EndPoint => tcpListener.LocalEndpoint as IPEndPoint;
 
         /// <summary>
         /// Start the FTP server.
