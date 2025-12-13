@@ -23,13 +23,14 @@ namespace Zhaobang.FtpServer
     /// </summary>
     public sealed class FtpServer : IControlConnectionHost
     {
+        private readonly IPEndPoint listenEndPoint;
         private readonly IDataConnectionFactory dataConnFactory;
         private readonly IAuthenticator authenticator;
         private readonly IFileProviderFactory fileProviderFactory;
         private readonly IControlConnectionSslFactory controlConnectionSslFactory;
         private readonly FtpTracer tracer = new FtpTracer();
 
-        private TcpListener tcpListener;
+        private Socket listenSocket;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FtpServer"/> class
@@ -76,7 +77,7 @@ namespace Zhaobang.FtpServer
             IAuthenticator authenticator,
             IControlConnectionSslFactory controlConnectionSslFactory)
         {
-            tcpListener = new TcpListener(endPoint);
+            this.listenEndPoint = endPoint ?? throw new ArgumentNullException(nameof(endPoint));
 
             this.fileProviderFactory = fileProviderFactory;
             this.dataConnFactory = dataConnFactory;
@@ -105,7 +106,7 @@ namespace Zhaobang.FtpServer
         /// <summary>
         /// Gets the local end point the server is listening on.
         /// </summary>
-        internal IPEndPoint EndPoint => tcpListener.LocalEndpoint as IPEndPoint;
+        internal IPEndPoint EndPoint => listenSocket.LocalEndPoint as IPEndPoint;
 
         /// <summary>
         /// Start the FTP server.
@@ -116,14 +117,20 @@ namespace Zhaobang.FtpServer
         {
             try
             {
-                tcpListener.Start();
-                cancellationToken.Register(() => tcpListener.Stop());
-                while (true)
+                if (this.listenSocket != null)
                 {
-                    TcpClient tcpClient;
+                    throw new InvalidOperationException("The server is already running.");
+                }
+
+                this.listenSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                this.listenSocket.Bind(this.listenEndPoint);
+                this.listenSocket.Listen(int.MaxValue);
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    Socket acceptSocket;
                     try
                     {
-                        tcpClient = await tcpListener.AcceptTcpClientAsync().WithCancellation(cancellationToken);
+                        acceptSocket = await this.listenSocket.AcceptAsync(cancellationToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -136,16 +143,16 @@ namespace Zhaobang.FtpServer
                         {
                             using (var handler = new ControlConnection(
                                 this,
-                                tcpClient.GetStream(),
-                                tcpClient.Client.RemoteEndPoint as IPEndPoint,
-                                tcpClient.Client.LocalEndPoint as IPEndPoint))
+                                new NetworkStream(acceptSocket),
+                                acceptSocket.RemoteEndPoint as IPEndPoint,
+                                acceptSocket.LocalEndPoint as IPEndPoint))
                             {
                                 await handler.RunAsync(cancellationToken);
                             }
                         }
                         finally
                         {
-                            tcpClient.Dispose();
+                            acceptSocket.Dispose();
                         }
                     }
                     _ = Run();
@@ -153,7 +160,8 @@ namespace Zhaobang.FtpServer
             }
             finally
             {
-                tcpListener.Stop();
+                this.listenSocket.Dispose();
+                this.listenSocket = null;
             }
         }
 
