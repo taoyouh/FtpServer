@@ -107,7 +107,7 @@ namespace Zhaobang.FtpServer.Tests.Connections
             Assert.IsNotNull(epsvResponse);
 
             ReadOnlySpan<byte> epsvAddress = GetAddressFromEpsv(epsvResponse);
-            var epsvPortNum = GetPortFromEpsvAddress(epsvAddress);
+            int epsvPortNum = GetPortFromEpsvAddress(epsvAddress);
             using TcpClient dataClient = new(this.serverEndPoint.AddressFamily);
             await dataClient.ConnectAsync(this.serverEndPoint.Address, epsvPortNum, this.testContext.CancellationToken);
 
