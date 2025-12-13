@@ -134,7 +134,8 @@ namespace Zhaobang.FtpServer.Tests.Connections
             ];
             fileProvider.Setup(x => x.GetListingAsync(string.Empty)).Returns(Task.FromResult(files.AsEnumerable()));
             await this.WriteLineAsync("LIST"u8.ToArray());
-            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("125 "u8));
+            byte[]? listResponse = await this.ReadLineAsync();
+            Assert.IsTrue(listResponse.AsSpan().StartsWith("125 "u8) || listResponse.AsSpan().StartsWith("150 "u8));
             using NetworkStream dataStream = dataClient.GetStream();
             List<byte[]> listResult = await this.ReadLinesAsync(dataStream);
 

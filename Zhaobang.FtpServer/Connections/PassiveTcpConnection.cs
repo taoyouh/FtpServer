@@ -27,8 +27,7 @@ namespace Zhaobang.FtpServer.Connections
         {
             var listenSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             listenSocket.Bind(new IPEndPoint(listenAddress, 0));
-            listenSocket.Blocking = false;
-            listenSocket.Listen(1);
+            listenSocket.Listen(0);
             this.ListenEndPoint = (IPEndPoint)listenSocket.LocalEndPoint;
             this.acceptTask = AcceptAsync(listenSocket, this.cts.Token);
         }
@@ -70,22 +69,13 @@ namespace Zhaobang.FtpServer.Connections
         {
             try
             {
-                while (true)
+                if (token.IsCancellationRequested)
                 {
-                    if (token.IsCancellationRequested)
-                    {
-                        throw new OperationCanceledException("The current listener is closed before any incoming connection.");
-                    }
-
-                    await Task.Yield();
-                    if (listenSocket.Poll(0, SelectMode.SelectRead))
-                    {
-                        Socket connectSocket = listenSocket.Accept();
-                        connectSocket.Blocking = true;
-                        this.stream = new NetworkStream(connectSocket, true);
-                        break;
-                    }
+                    throw new OperationCanceledException("The current listener is closed before any incoming connection.");
                 }
+
+                Socket connectSocket = await listenSocket.AcceptAsync(token);
+                this.stream = new NetworkStream(connectSocket, true);
             }
             finally
             {
