@@ -177,6 +177,12 @@ namespace Zhaobang.FtpServer.Connections
                 while (true)
                 {
                     var command = await ReadLineAsync();
+                    if (command == null)
+                    {
+                        // Reaches end of stream
+                        break;
+                    }
+
                     try
                     {
                         await ProcessCommandAsync(command);
@@ -460,7 +466,7 @@ namespace Zhaobang.FtpServer.Connections
             try
             {
                 var listing = await fileProvider.GetListingAsync(parameter);
-                await writer.WriteLineAsync();
+                await writer.WriteLineAsync($"Total {listing.Count()}");
                 foreach (var item in listing)
                 {
                     if (listFormat == ListFormat.Unix)
@@ -838,7 +844,7 @@ namespace Zhaobang.FtpServer.Connections
                 var byteCount = await stream.ReadAsync(readByteBuffer, readOffset, readByteBuffer.Length - readOffset);
                 if (byteCount == 0)
                 {
-                    throw new EndOfStreamException();
+                    return null;
                 }
                 for (int i = readOffset; i < readOffset + byteCount; i++)
                 {

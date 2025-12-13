@@ -107,19 +107,7 @@ namespace Zhaobang.FtpServer.Tests.Connections
             Assert.IsNotNull(epsvResponse);
 
             ReadOnlySpan<byte> epsvAddress = GetAddressFromEpsv(epsvResponse);
-            byte epsvAddressDelimiter = epsvAddress[0];
-            for (int i = 0; i < 3; ++i)
-            {
-                int index = epsvAddress.IndexOf(epsvAddressDelimiter);
-                Assert.IsGreaterThanOrEqualTo(0, index);
-                epsvAddress = epsvAddress[(index + 1)..];
-            }
-
-            int delimiterIndexAfterPort = epsvAddress.IndexOf(epsvAddressDelimiter);
-            Assert.IsGreaterThanOrEqualTo(0, delimiterIndexAfterPort);
-            Assert.AreEqual(epsvAddress.Length - 1, delimiterIndexAfterPort);
-            ReadOnlySpan<byte> epsvPort = epsvAddress[..delimiterIndexAfterPort];
-            var epsvPortNum = int.Parse(epsvPort, CultureInfo.InvariantCulture);
+            var epsvPortNum = GetPortFromEpsvAddress(epsvAddress);
             using TcpClient dataClient = new(this.serverEndPoint.AddressFamily);
             await dataClient.ConnectAsync(this.serverEndPoint.Address, epsvPortNum, this.testContext.CancellationToken);
 
@@ -155,6 +143,91 @@ namespace Zhaobang.FtpServer.Tests.Connections
 
             await this.WriteLineAsync("QUIT"u8.ToArray());
             Assert.IsNull(await this.ReadLineAsync());
+
+            await runTask;
+        }
+
+        /// <summary>
+        /// Windows Explorer on Windows 11 25H2 uses this sequence to get file list.
+        /// </summary>
+        /// <returns>The task representing the async operation.</returns>
+        [TestMethod]
+        public async Task ListFileEmptyDirectoryTestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            var runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS IEUser@"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            await this.WriteLineAsync("opts utf8 on"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            fileProvider.Setup(x => x.GetWorkingDirectory()).Returns("/");
+            await this.WriteLineAsync("PWD"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().SequenceEqual("257 \"/\""u8));
+
+            await this.WriteLineAsync("TYPE A"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            // RFC 2428
+            await this.WriteLineAsync("EPSV"u8.ToArray());
+            byte[]? epsvResponse = await this.ReadLineAsync();
+            Assert.IsNotNull(epsvResponse);
+
+            ReadOnlySpan<byte> epsvAddress = GetAddressFromEpsv(epsvResponse);
+            int epsvPortNum = GetPortFromEpsvAddress(epsvAddress);
+            using TcpClient dataClient = new(this.serverEndPoint.AddressFamily);
+            await dataClient.ConnectAsync(this.serverEndPoint.Address, epsvPortNum, this.testContext.CancellationToken);
+
+            FileSystemEntry[] files = [];
+            fileProvider.Setup(x => x.GetListingAsync(string.Empty)).Returns(Task.FromResult(files.AsEnumerable()));
+            await this.WriteLineAsync("LIST"u8.ToArray());
+            byte[]? listResponse = await this.ReadLineAsync();
+            Assert.IsTrue(listResponse.AsSpan().StartsWith("125 "u8) || listResponse.AsSpan().StartsWith("150 "u8));
+            using NetworkStream dataStream = dataClient.GetStream();
+            List<byte[]> listResult = await this.ReadLinesAsync(dataStream);
+
+            Assert.HasCount(files.Length + 2, listResult);
+            Assert.IsTrue(listResult[0].All(x => x < 128));
+
+            // If only one CRLF is printed, Windows 11 25H2 considers it as error.
+            Assert.IsNotEmpty(listResult[0]);
+            Assert.IsEmpty(listResult[1]);
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("226 "u8));
+
+            await this.WriteLineAsync("noop"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        private static int GetPortFromEpsvAddress(ReadOnlySpan<byte> epsvAddress)
+        {
+            byte epsvAddressDelimiter = epsvAddress[0];
+            for (int i = 0; i < 3; ++i)
+            {
+                int index = epsvAddress.IndexOf(epsvAddressDelimiter);
+                Assert.IsGreaterThanOrEqualTo(0, index);
+                epsvAddress = epsvAddress[(index + 1)..];
+            }
+
+            int delimiterIndexAfterPort = epsvAddress.IndexOf(epsvAddressDelimiter);
+            Assert.IsGreaterThanOrEqualTo(0, delimiterIndexAfterPort);
+            Assert.AreEqual(epsvAddress.Length - 1, delimiterIndexAfterPort);
+            ReadOnlySpan<byte> epsvPort = epsvAddress[..delimiterIndexAfterPort];
+            var epsvPortNum = int.Parse(epsvPort, CultureInfo.InvariantCulture);
+            return epsvPortNum;
         }
 
         private static ReadOnlySpan<byte> GetAddressFromEpsv(ReadOnlySpan<byte> epsvResponse)
