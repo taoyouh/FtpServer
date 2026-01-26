@@ -44,7 +44,10 @@ namespace Zhaobang.FtpServer.Tests
             using TcpClient client = new();
             await client.ConnectAsync(endPoint, this.testContext.CancellationToken);
             using NetworkStream clientStream = client.GetStream();
-            using StreamWriter writer = new(clientStream);
+            using StreamWriter writer = new(clientStream)
+            {
+                NewLine = "\r\n",
+            };
             using StreamReader reader = new(clientStream);
             Assert.IsTrue((await reader.ReadLineAsync(this.testContext.CancellationToken))?.StartsWith("220 ", StringComparison.Ordinal));
             await writer.WriteLineAsync("QUIT".AsMemory(), this.testContext.CancellationToken);
@@ -67,9 +70,15 @@ namespace Zhaobang.FtpServer.Tests
             await client2.ConnectAsync(endPoint, this.testContext.CancellationToken);
             using NetworkStream clientStream1 = client1.GetStream();
             using NetworkStream clientStream2 = client2.GetStream();
-            using StreamWriter writer1 = new(clientStream1);
+            using StreamWriter writer1 = new(clientStream1)
+            {
+                NewLine = "\r\n",
+            };
             using StreamReader reader1 = new(clientStream1);
-            using StreamWriter writer2 = new(clientStream2);
+            using StreamWriter writer2 = new(clientStream2)
+            {
+                NewLine = "\r\n",
+            };
             using StreamReader reader2 = new(clientStream2);
             Assert.IsTrue((await reader1.ReadLineAsync(this.testContext.CancellationToken))?.StartsWith("220 ", StringComparison.Ordinal));
             Assert.IsTrue((await reader2.ReadLineAsync(this.testContext.CancellationToken))?.StartsWith("220 ", StringComparison.Ordinal));
