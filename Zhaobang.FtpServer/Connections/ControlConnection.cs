@@ -3,6 +3,7 @@
 // </copyright>
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -52,10 +53,6 @@ namespace Zhaobang.FtpServer.Connections
         private IPAddress userActiveIP;
         private int userActiveDataPort = 20;
 
-        /// <summary>
-        /// This is relevant to user, and should be available if
-        /// and only if <see cref="authenticated"/> is true.
-        /// </summary>
         private IFileProvider fileProvider;
 
         /// <summary>
@@ -71,6 +68,8 @@ namespace Zhaobang.FtpServer.Connections
         private ListFormat listFormat = ListFormat.Unix;
 
         private bool useSecureDataConnection = false;
+
+        private MLstCommandHandler mLstCommandHandler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ControlConnection"/> class to handle the FTP control connection.
@@ -153,6 +152,29 @@ namespace Zhaobang.FtpServer.Connections
         }
 
         /// <summary>
+        /// Gets or sets the file provider instance for the current authenticated user. The value should be available if and only if <see cref="authenticated"/> is true.
+        /// </summary>
+        public IFileProvider FileProvider
+        {
+            get => this.fileProvider;
+            set
+            {
+                if (this.fileProvider != value)
+                {
+                    this.fileProvider = value;
+                    if (this.fileProvider is IMLstFileProvider fileProvider)
+                    {
+                        this.mLstCommandHandler = new MLstCommandHandler(fileProvider);
+                    }
+                    else
+                    {
+                        this.mLstCommandHandler = null;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Dispose of all the connections.
         /// </summary>
         public void Dispose()
@@ -215,69 +237,72 @@ namespace Zhaobang.FtpServer.Connections
             switch (command.ToUpper())
             {
                 case "RNFR":
-                    if (!authenticated)
+                    if (!await EnsureAuthenticatedAsync())
                     {
-                        await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                         return;
                     }
                     await CommandRnfrAsync(parameter);
                     return;
                 case "RNTO":
-                    if (!authenticated)
+                    if (!await EnsureAuthenticatedAsync())
                     {
-                        await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                         return;
                     }
                     await ReplyAsync(FtpReplyCode.BadSequence, "Should use RNFR first");
                     return;
                 case "DELE":
-                    if (!authenticated)
+                    if (!await EnsureAuthenticatedAsync())
                     {
-                        await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                         return;
                     }
-                    await fileProvider.DeleteAsync(parameter);
+                    await FileProvider.DeleteAsync(parameter);
                     await ReplyAsync(FtpReplyCode.FileActionOk, "Delete succeeded");
                     return;
                 case "RMD":
-                    if (!authenticated)
+                    if (!await EnsureAuthenticatedAsync())
                     {
-                        await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                         return;
                     }
-                    await fileProvider.DeleteDirectoryAsync(parameter);
+                    await FileProvider.DeleteDirectoryAsync(parameter);
                     await ReplyAsync(FtpReplyCode.FileActionOk, "Directory deleted");
                     return;
                 case "MKD":
-                    if (!authenticated)
+                    if (!await EnsureAuthenticatedAsync())
                     {
-                        await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                         return;
                     }
-                    await fileProvider.CreateDirectoryAsync(parameter);
+                    await FileProvider.CreateDirectoryAsync(parameter);
                     await ReplyAsync(
                         FtpReplyCode.PathCreated,
                         string.Format(
                             "\"{0}\"",
-                            fileProvider.GetWorkingDirectory().Replace("\"", "\"\"")));
+                            FileProvider.GetWorkingDirectory().Replace("\"", "\"\"")));
                     return;
                 case "PWD":
-                    if (!authenticated)
+                    if (!await EnsureAuthenticatedAsync())
                     {
-                        await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                         return;
                     }
                     await ReplyAsync(
                         FtpReplyCode.PathCreated,
                         string.Format(
                             "\"{0}\"",
-                            fileProvider.GetWorkingDirectory().Replace("\"", "\"\"")));
+                            FileProvider.GetWorkingDirectory().Replace("\"", "\"\"")));
                     return;
                 case "SYST":
                     await ReplyAsync(FtpReplyCode.NameSystemType, "UNIX simulated by .NET Core");
                     return;
                 case "FEAT":
-                    await ReplyMultilineAsync(FtpReplyCode.SystemStatus, "Supports:\nUTF8");
+                    var features = new List<string>
+                    {
+                        "UTF8",
+                    };
+                    if (this.mLstCommandHandler != null)
+                    {
+                        string featLine = this.mLstCommandHandler.GetFeatLine();
+                        features.Add(featLine);
+                    }
+                    await ReplyMultilineAsync(FtpReplyCode.SystemStatus, $"Supports:\n{string.Join("\n", features)}");
                     return;
                 case "OPTS":
                     if (parameter.ToUpperInvariant() == "UTF8 ON")
@@ -292,23 +317,44 @@ namespace Zhaobang.FtpServer.Connections
                         await ReplyAsync(FtpReplyCode.CommandOkay, "UTF-8 is off");
                         return;
                     }
+                    else if (parameter.StartsWith("MLST", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (mLstCommandHandler != null)
+                        {
+                            if (mLstCommandHandler.HandleOpts(parameter))
+                            {
+                                await ReplyAsync(FtpReplyCode.CommandOkay, "MLST options set");
+                                return;
+                            }
+                            else
+                            {
+                                await ReplyAsync(FtpReplyCode.SyntaxErrorInParametersOrArguments, "Syntax error");
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            await ReplyAsync(FtpReplyCode.ParameterNotImplemented, "MLST not supported");
+                            return;
+                        }
+                    }
                     break;
                 case "USER":
                     userName = parameter;
                     authenticated = false;
-                    fileProvider = null;
+                    FileProvider = null;
                     await ReplyAsync(FtpReplyCode.NeedPassword, "Please input password");
                     return;
                 case "PASS":
                     if (authenticated = host.Authenticator.Authenticate(userName, parameter))
                     {
                         await ReplyAsync(FtpReplyCode.UserLoggedIn, "Logged in");
-                        fileProvider = host.FileManager.GetProvider(userName);
+                        FileProvider = host.FileManager.GetProvider(userName);
                     }
                     else
                     {
                         await ReplyAsync(FtpReplyCode.NotLoggedIn, "Failed to log in");
-                        fileProvider = null;
+                        FileProvider = null;
                     }
                     return;
                 case "PORT":
@@ -363,14 +409,13 @@ namespace Zhaobang.FtpServer.Connections
                     await CommandStorAsync(parameter);
                     return;
                 case "CWD":
-                    if (!authenticated)
+                    if (!await EnsureAuthenticatedAsync())
                     {
-                        await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                         return;
                     }
-                    if (fileProvider.SetWorkingDirectory(parameter))
+                    if (FileProvider.SetWorkingDirectory(parameter))
                     {
-                        await ReplyAsync(FtpReplyCode.FileActionOk, fileProvider.GetWorkingDirectory());
+                        await ReplyAsync(FtpReplyCode.FileActionOk, FileProvider.GetWorkingDirectory());
                     }
                     else
                     {
@@ -391,6 +436,12 @@ namespace Zhaobang.FtpServer.Connections
                     return;
                 case "PROT":
                     await CommandProtAsync(parameter);
+                    return;
+                case "MLSD":
+                    await CommandMLsDAsync(parameter);
+                    return;
+                case "MLST":
+                    await CommandMLstAsync(parameter);
                     return;
             }
             await ReplyAsync(FtpReplyCode.CommandUnrecognized, "Can't recognize this command.");
@@ -442,15 +493,14 @@ namespace Zhaobang.FtpServer.Connections
                 return;
             }
             var toPath = nextCommand.Substring(5);
-            await fileProvider.RenameAsync(fromPath, toPath);
+            await FileProvider.RenameAsync(fromPath, toPath);
             await ReplyAsync(FtpReplyCode.FileActionOk, "Rename succeeded");
         }
 
         private async Task CommandListAsync(string parameter)
         {
-            if (!authenticated)
+            if (!await EnsureAuthenticatedAsync())
             {
-                await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                 return;
             }
             MemoryStream stream = new MemoryStream();
@@ -469,6 +519,7 @@ namespace Zhaobang.FtpServer.Connections
                 await writer.WriteLineAsync($"Total {listing.Count()}");
                 foreach (var item in listing)
                 {
+                    DateTime lastWriteTime = item.LastWriteTime.ToLocalTime();
                     if (listFormat == ListFormat.Unix)
                     {
                         await writer.WriteLineAsync(
@@ -477,8 +528,8 @@ namespace Zhaobang.FtpServer.Connections
                                 item.IsDirectory ? 'd' : '-',
                                 item.IsReadOnly ? "r-x" : "rwx",
                                 item.Length,
-                                item.LastWriteTime.ToString(
-                                    item.LastWriteTime.Year == DateTime.Now.Year ?
+                                lastWriteTime.ToString(
+                                    lastWriteTime.Year == DateTime.Now.Year ?
                                     "MMM dd HH:mm" : "MMM dd  yyyy", CultureInfo.InvariantCulture),
                                 item.Name));
                     }
@@ -490,7 +541,7 @@ namespace Zhaobang.FtpServer.Connections
                                 string.Format(
                                     CultureInfo.InvariantCulture,
                                     "{0:MM-dd-yy  hh:mmtt} {1,20} {2}",
-                                    item.LastWriteTime,
+                                    lastWriteTime.ToLocalTime(),
                                     item.Length,
                                     item.Name));
                         }
@@ -500,7 +551,7 @@ namespace Zhaobang.FtpServer.Connections
                                 string.Format(
                                     CultureInfo.InvariantCulture,
                                     "{0:MM-dd-yy  hh:mmtt}       {1,-14} {2}",
-                                    item.LastWriteTime,
+                                    lastWriteTime.ToLocalTime(),
                                     "<DIR>",
                                     item.Name));
                         }
@@ -511,15 +562,16 @@ namespace Zhaobang.FtpServer.Connections
                     }
                 }
             }
-            catch (FileBusyException ex)
+            catch (Exception ex)
             {
-                await ReplyAsync(FtpReplyCode.FileBusy, string.Format("File temporarily unavailable: {0}", ex.Message));
-                return;
-            }
-            catch (FileNoAccessException ex)
-            {
-                await ReplyAsync(FtpReplyCode.FileNoAccess, string.Format("File access denied: {0}", ex.Message));
-                return;
+                if (await this.HandleExceptionAsync(ex))
+                {
+                    return;
+                }
+                else
+                {
+                    throw;
+                }
             }
             writer.Flush();
             stream.Seek(0, SeekOrigin.Begin);
@@ -532,9 +584,8 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task CommandNlstAsync(string parameter)
         {
-            if (!authenticated)
+            if (!await EnsureAuthenticatedAsync())
             {
-                await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                 return;
             }
             MemoryStream stream = new MemoryStream();
@@ -542,21 +593,22 @@ namespace Zhaobang.FtpServer.Connections
             writer.NewLine = "\r\n";
             try
             {
-                var nameListing = await fileProvider.GetNameListingAsync(parameter);
+                var nameListing = await FileProvider.GetNameListingAsync(parameter);
                 foreach (var item in nameListing)
                 {
                     await writer.WriteLineAsync(item);
                 }
             }
-            catch (FileBusyException ex)
+            catch (Exception ex)
             {
-                await ReplyAsync(FtpReplyCode.FileBusy, string.Format("File temporarily unavailable: {0}", ex.Message));
-                return;
-            }
-            catch (FileNoAccessException ex)
-            {
-                await ReplyAsync(FtpReplyCode.FileNoAccess, string.Format("File access denied: {0}", ex.Message));
-                return;
+                if (await this.HandleExceptionAsync(ex))
+                {
+                    return;
+                }
+                else
+                {
+                    throw;
+                }
             }
             writer.Flush();
             stream.Seek(0, SeekOrigin.Begin);
@@ -569,9 +621,8 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task CommandStorAsync(string parameter)
         {
-            if (!authenticated)
+            if (!await EnsureAuthenticatedAsync())
             {
-                await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                 return;
             }
             if (string.IsNullOrEmpty(parameter))
@@ -589,7 +640,7 @@ namespace Zhaobang.FtpServer.Connections
 
             try
             {
-                using (Stream fileStream = await fileProvider.CreateFileForWriteAsync(parameter))
+                using (Stream fileStream = await FileProvider.CreateFileForWriteAsync(parameter))
                 {
                     await OpenDataConnectionAsync();
                     await dataConnection.RecieveAsync(fileStream);
@@ -614,9 +665,8 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task CommandRetrAsync(string parameter)
         {
-            if (!authenticated)
+            if (!await EnsureAuthenticatedAsync())
             {
-                await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
                 return;
             }
             if (string.IsNullOrEmpty(parameter))
@@ -634,21 +684,22 @@ namespace Zhaobang.FtpServer.Connections
 
             try
             {
-                using (Stream fileStream = await fileProvider.OpenFileForReadAsync(parameter))
+                using (Stream fileStream = await FileProvider.OpenFileForReadAsync(parameter))
                 {
                     await OpenDataConnectionAsync();
                     await dataConnection.SendAsync(fileStream);
                 }
             }
-            catch (FileBusyException ex)
+            catch (Exception ex)
             {
-                await ReplyAsync(FtpReplyCode.FileBusy, string.Format("File temporarily unavailable: {0}", ex.Message));
-                return;
-            }
-            catch (FileNoAccessException ex)
-            {
-                await ReplyAsync(FtpReplyCode.FileNoAccess, string.Format("File access denied: {0}", ex.Message));
-                return;
+                if (await this.HandleExceptionAsync(ex))
+                {
+                    return;
+                }
+                else
+                {
+                    throw;
+                }
             }
             await dataConnection.DisconnectAsync();
             await ReplyAsync(FtpReplyCode.SuccessClosingDataConnection, "File has been sent");
@@ -802,6 +853,74 @@ namespace Zhaobang.FtpServer.Connections
                 string.Format("Entering extended passive mode. (|||{0}|)", port));
         }
 
+        private async Task CommandMLsDAsync(string parameter)
+        {
+            if (!await this.EnsureAuthenticatedAsync())
+            {
+                return;
+            }
+            else if (this.mLstCommandHandler == null)
+            {
+                await ReplyAsync(FtpReplyCode.CommandUnrecognized, "Can't recognize this command.");
+                return;
+            }
+
+            var stream = new MemoryStream();
+            try
+            {
+                await this.mLstCommandHandler.FormatChildItemsAsync(parameter, stream);
+            }
+            catch (Exception ex)
+            {
+                if (await this.HandleExceptionAsync(ex))
+                {
+                    return;
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            stream.Seek(0, SeekOrigin.Begin);
+
+            await this.OpenDataConnectionAsync();
+            await this.dataConnection.SendAsync(stream);
+            await this.dataConnection.DisconnectAsync();
+            await this.ReplyAsync(FtpReplyCode.SuccessClosingDataConnection, "Listing has been sent");
+        }
+
+        private async Task CommandMLstAsync(string parameter)
+        {
+            if (!await EnsureAuthenticatedAsync())
+            {
+                return;
+            }
+            else if (this.mLstCommandHandler == null)
+            {
+                await ReplyAsync(FtpReplyCode.CommandUnrecognized, "Can't recognize this command.");
+            }
+
+            try
+            {
+                string formattedItem = await this.mLstCommandHandler.GetFormattedItemAsync(parameter);
+                await this.ReplyMultilineAsync(FtpReplyCode.FileActionOk, string.Format(
+                    CultureInfo.InvariantCulture, "Listing item\r\n{0}", formattedItem));
+            }
+            catch (Exception ex)
+            {
+                if (await this.HandleExceptionAsync(ex))
+                {
+                    return;
+                }
+                else
+                {
+                    throw;
+                }
+            }
+            return;
+        }
+
         private async Task OpenDataConnectionAsync()
         {
             if (dataConnection != null && dataConnection.IsOpen)
@@ -930,6 +1049,42 @@ namespace Zhaobang.FtpServer.Connections
         private string DecodePathName(string path)
         {
             return path.Replace("\r\0", "\r\0");
+        }
+
+        private async Task<bool> EnsureAuthenticatedAsync()
+        {
+            if (!authenticated)
+            {
+                await ReplyAsync(FtpReplyCode.NotLoggedIn, "You need to log in first");
+                return false;
+            }
+
+            return true;
+        }
+
+        private async Task<bool> HandleExceptionAsync(Exception ex)
+        {
+            if (ex is FileBusyException ex2)
+            {
+                await ReplyAsync(FtpReplyCode.FileBusy, string.Format("File temporarily unavailable: {0}", ex2.Message));
+                return true;
+            }
+            else if (ex is FileNoAccessException ex3)
+            {
+                await ReplyAsync(FtpReplyCode.FileNoAccess, string.Format("File access denied: {0}", ex3.Message));
+                return true;
+            }
+            else if (ex is ArgumentException ex4)
+            {
+                // RFC 3659 7.2.1: Giving a pathname that exists but is not a directory
+                // as the argument to a MLSD command generates a 501 reply.
+                await ReplyAsync(FtpReplyCode.SyntaxErrorInParametersOrArguments, string.Format("Syntax error: {0}", ex4.Message));
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
     }
 }
