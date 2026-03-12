@@ -15,7 +15,7 @@ namespace Zhaobang.FtpServer.File
     /// <summary>
     /// Provides the same root directory to all users.
     /// </summary>
-    public class SimpleFileProvider : IFileProvider
+    public class SimpleFileProvider : IFileProvider, IMLstFileProvider
     {
         /// <summary>
         /// The root directory for ftp.
@@ -260,14 +260,7 @@ namespace Zhaobang.FtpServer.File
                     FileInfo fileInfo = new FileInfo(localPath);
                     return new[]
                     {
-                        new FileSystemEntry
-                        {
-                            Name = fileInfo.Name,
-                            IsDirectory = false,
-                            Length = fileInfo.Length,
-                            IsReadOnly = fileInfo.IsReadOnly,
-                            LastWriteTime = fileInfo.LastWriteTime,
-                        },
+                        ToEntry(fileInfo),
                     };
                 }
                 catch (FileNotFoundException)
@@ -277,24 +270,10 @@ namespace Zhaobang.FtpServer.File
 
                 var directories = Directory.GetDirectories(localPath)
                     .Select(x => new DirectoryInfo(x))
-                    .Select(x => new FileSystemEntry
-                    {
-                        Name = x.Name,
-                        IsDirectory = true,
-                        Length = 0,
-                        IsReadOnly = false,
-                        LastWriteTime = x.LastWriteTime,
-                    });
+                    .Select(ToEntry);
                 var files = Directory.GetFiles(localPath)
                     .Select(x => new FileInfo(x))
-                    .Select(x => new FileSystemEntry
-                    {
-                        Name = x.Name,
-                        IsDirectory = false,
-                        Length = x.Length,
-                        IsReadOnly = x.IsReadOnly,
-                        LastWriteTime = x.LastWriteTime,
-                    });
+                    .Select(ToEntry);
                 return directories.Concat<FileSystemEntry>(files);
             }
             catch (Exception ex)
@@ -309,6 +288,142 @@ namespace Zhaobang.FtpServer.File
                 else
                     throw new FileBusyException(ex.Message, ex);
             }
+        }
+
+        /// <summary>
+        /// Gets a file system entry at the specified path.
+        /// </summary>
+        /// <param name="path">Absolute or relative FTP path of the file or directory.</param>
+        /// <returns>The file system entry.</returns>
+        /// <exception cref="FileBusyException">The operation failed but worth a retry.</exception>
+        /// <exception cref="FileNoAccessException">The entry can't be obtained.</exception>
+        public Task<FileSystemEntry> GetItemAsync(string path)
+        {
+            try
+            {
+                string localPath = GetLocalPath(path);
+
+                // Try as file first
+                FileInfo fileInfo = new FileInfo(localPath);
+                if (fileInfo.Exists)
+                {
+                    return Task.FromResult(ToEntry(fileInfo));
+                }
+
+                // Try as directory
+                DirectoryInfo dirInfo = new DirectoryInfo(localPath);
+                if (dirInfo.Exists)
+                {
+                    return Task.FromResult(ToEntry(dirInfo));
+                }
+
+                // Neither file nor directory exists
+                throw new FileNoAccessException($"Path '{path}' does not exist");
+            }
+            catch (FileNoAccessException)
+            {
+                throw;
+            }
+            catch (FileBusyException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (ex is ArgumentException ||
+                    ex is ArgumentNullException ||
+                    ex is PathTooLongException ||
+                    ex is SecurityException ||
+                    ex is DirectoryNotFoundException)
+                    throw new FileNoAccessException(ex.Message, ex);
+                else if (ex is UnauthorizedAccessException)
+                    throw;
+                else
+                    throw new FileBusyException(ex.Message, ex);
+            }
+        }
+
+        /// <summary>
+        /// Gets the child items of the specified directory.
+        /// </summary>
+        /// <param name="path">Absolute or relative FTP path of the directory.</param>
+        /// <returns>The child items.</returns>
+        /// <exception cref="FileBusyException">The operation failed but worth a retry.</exception>
+        /// <exception cref="FileNoAccessException">The listing can't be obtained.</exception>
+        /// <exception cref="ArgumentException">The path exists but is not a directory.</exception>
+        public Task<IEnumerable<FileSystemEntry>> GetChildItems(string path)
+        {
+            try
+            {
+                string localPath = GetLocalPath(path);
+                DirectoryInfo dirInfo = new DirectoryInfo(localPath);
+                FileInfo fileInfo = new FileInfo(localPath);
+
+                // Check if path is a file first
+                if (fileInfo.Exists && (fileInfo.Attributes & FileAttributes.Directory) == 0)
+                {
+                    throw new ArgumentException($"Path '{path}' is not a directory");
+                }
+
+                // Check if directory exists
+                if (!dirInfo.Exists)
+                {
+                    throw new FileNoAccessException($"Directory '{path}' does not exist");
+                }
+
+                var directories = dirInfo.GetDirectories()
+                    .Select(ToEntry);
+                var files = dirInfo.GetFiles()
+                    .Select(ToEntry);
+                return Task.FromResult(directories.Concat(files));
+            }
+            catch (ArgumentException)
+            {
+                throw;
+            }
+            catch (FileNoAccessException)
+            {
+                throw;
+            }
+            catch (FileBusyException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (ex is PathTooLongException ||
+                    ex is SecurityException ||
+                    ex is DirectoryNotFoundException)
+                    throw new FileNoAccessException(ex.Message, ex);
+                else if (ex is UnauthorizedAccessException)
+                    throw;
+                else
+                    throw new FileBusyException(ex.Message, ex);
+            }
+        }
+
+        private static FileSystemEntry ToEntry(FileInfo fileInfo)
+        {
+            return new FileSystemEntry
+            {
+                Name = fileInfo.Name,
+                IsDirectory = false,
+                Length = fileInfo.Length,
+                IsReadOnly = fileInfo.IsReadOnly,
+                LastWriteTime = fileInfo.LastWriteTimeUtc,
+            };
+        }
+
+        private static FileSystemEntry ToEntry(DirectoryInfo dirInfo)
+        {
+            return new FileSystemEntry
+            {
+                Name = dirInfo.Name,
+                IsDirectory = true,
+                Length = 0,
+                IsReadOnly = false,
+                LastWriteTime = dirInfo.LastWriteTimeUtc,
+            };
         }
 
         /// <exception cref="ArgumentException">

@@ -69,47 +69,13 @@ namespace Zhaobang.FtpServer.Tests.Connections
             Assert.IsTrue((await this.ReadLineAsync()).AsSpan().SequenceEqual("257 \"/\""u8));
 
             await this.WriteLineAsync("FEAT"u8.ToArray());
-            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("211-"u8));
-            List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)> features = [];
-            while (true)
-            {
-                // RFC 2389 3.2
-                byte[]? line = await this.ReadLineAsync();
-                Assert.IsNotNull(line);
-                if (line.AsSpan().StartsWith("211 "u8))
-                {
-                    break;
-                }
-                else
-                {
-                    Assert.IsTrue(line.AsSpan().StartsWith(" "u8));
-                    ReadOnlyMemory<byte> fullFeature = line.AsMemory()[1..];
-                    int spaceIndex = fullFeature.Span.IndexOf((byte)' ');
-                    if (spaceIndex < 0)
-                    {
-                        features.Add((fullFeature, null));
-                    }
-                    else
-                    {
-                        features.Add((fullFeature[..spaceIndex], fullFeature[(spaceIndex + 1)..]));
-                    }
-                }
-            }
-
+            List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)> features = await this.ReadFeaturesAsync();
             Assert.Contains(f => f.FeatName.Span.SequenceEqual("UTF8"u8) && f.FeatParam == null, features);
 
             await this.WriteLineAsync("OPTS UTF8 ON"u8.ToArray());
             Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
 
-            // RFC 2428
-            await this.WriteLineAsync("EPSV"u8.ToArray());
-            byte[]? epsvResponse = await this.ReadLineAsync();
-            Assert.IsNotNull(epsvResponse);
-
-            ReadOnlySpan<byte> epsvAddress = GetAddressFromEpsv(epsvResponse);
-            int epsvPortNum = GetPortFromEpsvAddress(epsvAddress);
-            using TcpClient dataClient = new(this.serverEndPoint.AddressFamily);
-            await dataClient.ConnectAsync(this.serverEndPoint.Address, epsvPortNum, this.testContext.CancellationToken);
+            using TcpClient dataClient = await this.ConnectWithEpsvAsync();
 
             await this.WriteLineAsync("TYPE A"u8.ToArray());
             Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
@@ -179,15 +145,7 @@ namespace Zhaobang.FtpServer.Tests.Connections
             await this.WriteLineAsync("TYPE A"u8.ToArray());
             Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
 
-            // RFC 2428
-            await this.WriteLineAsync("EPSV"u8.ToArray());
-            byte[]? epsvResponse = await this.ReadLineAsync();
-            Assert.IsNotNull(epsvResponse);
-
-            ReadOnlySpan<byte> epsvAddress = GetAddressFromEpsv(epsvResponse);
-            int epsvPortNum = GetPortFromEpsvAddress(epsvAddress);
-            using TcpClient dataClient = new(this.serverEndPoint.AddressFamily);
-            await dataClient.ConnectAsync(this.serverEndPoint.Address, epsvPortNum, this.testContext.CancellationToken);
+            using TcpClient dataClient = await this.ConnectWithEpsvAsync();
 
             FileSystemEntry[] files = [];
             fileProvider.Setup(x => x.GetListingAsync(string.Empty)).Returns(Task.FromResult(files.AsEnumerable()));
@@ -207,6 +165,393 @@ namespace Zhaobang.FtpServer.Tests.Connections
 
             await this.WriteLineAsync("noop"u8.ToArray());
             Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        /// <summary>
+        /// Test handling of MLsD, OPTS MLst and the corresponding FEAT command, based on RFC 3659.
+        /// </summary>
+        /// <returns>The task representing the async operation.</returns>
+        [TestMethod]
+        public async Task MLsDTestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IMLstFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            await this.WriteLineAsync("FEAT"u8.ToArray());
+            {
+                List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)> features = await this.ReadFeaturesAsync();
+                (ReadOnlyMemory<byte> _, ReadOnlyMemory<byte>? mlstFeatParam) = features.Single(f => f.FeatName.Span.SequenceEqual("MLST"u8));
+                Dictionary<string, bool> facts = ParseMLstFeatParams(mlstFeatParam);
+                Assert.IsTrue(facts.ContainsKey("Size"));
+                Assert.IsTrue(facts.ContainsKey("Type"));
+                Assert.IsTrue(facts.ContainsKey("Perm"));
+                Assert.IsTrue(facts.ContainsKey("Modify"));
+            }
+
+            await this.WriteLineAsync("OPTS MLST Size;Type;Perm;Modify;"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            await this.WriteLineAsync("FEAT"u8.ToArray());
+            {
+                List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)> features = await this.ReadFeaturesAsync();
+                (ReadOnlyMemory<byte> _, ReadOnlyMemory<byte>? mlstFeatParam) = features.Single(f => f.FeatName.Span.SequenceEqual("MLST"u8));
+                Dictionary<string, bool> facts = ParseMLstFeatParams(mlstFeatParam);
+                Assert.IsTrue(facts["Size"]);
+                Assert.IsTrue(facts["Type"]);
+                Assert.IsTrue(facts["Perm"]);
+                Assert.IsTrue(facts["Modify"]);
+            }
+
+            FileSystemEntry[] files =
+            [
+                new() { Name = "图片.jpg", Length = long.MaxValue, LastWriteTime = new DateTime(1000, 1, 1, 0, 0, 0, 0) },
+                new() { Name = "video.mp4", Length = 1, IsDirectory = true, LastWriteTime = new DateTime(9999, 12, 31, 23, 59, 59, 999) },
+                new() { Name = "текст.txt", Length = 15, LastWriteTime = new DateTime(2026, 1, 28, 21, 2, 1, 234) },
+                new() { Name = "Folder", IsDirectory = true, LastWriteTime = new DateTime(2026, 1, 28, 21, 2, 2, 345) },
+                new() { Name = "Read only folder", IsDirectory = true, IsReadOnly = true, LastWriteTime = new DateTime(2026, 1, 28, 21, 2, 3, 456) },
+            ];
+            fileProvider.Setup(x => x.GetWorkingDirectory()).Returns("/");
+            fileProvider.Setup(x => x.GetChildItems(string.Empty)).Returns(Task.FromResult(files.AsEnumerable()));
+            {
+                using TcpClient dataClient = await this.ConnectWithEpsvAsync();
+                using NetworkStream dataStream = dataClient.GetStream();
+
+                await this.WriteLineAsync("MLsD"u8.ToArray());
+                byte[]? mlsdResponse = await this.ReadLineAsync();
+                Assert.IsTrue(mlsdResponse.AsSpan().StartsWith("125 "u8) || mlsdResponse.AsSpan().StartsWith("150 "u8));
+
+                List<byte[]> listResult = await this.ReadLinesAsync(dataStream);
+                Assert.HasCount(files.Length + 1, listResult);
+                for (int i = 0; i < files.Length; ++i)
+                {
+                    (Dictionary<string, string> facts, string pathName) = ParseMlsXEntry(listResult[i]);
+                    Assert.AreEqual(files[i].Name, pathName);
+                    Assert.HasCount(4, facts); // Size, type, perm and modify
+                    Assert.AreEqual(files[i].Length, long.Parse(facts["Size"], CultureInfo.InvariantCulture));
+                    if (files[i].IsDirectory)
+                    {
+                        Assert.AreEqual("dir", facts["Type"]);
+
+                        if (files[i].IsReadOnly)
+                        {
+                            Assert.AreEqual("defl", facts["Perm"]);
+                        }
+                        else
+                        {
+                            Assert.AreEqual("cdeflmp", facts["Perm"]);
+                        }
+                    }
+                    else
+                    {
+                        Assert.AreEqual("file", facts["Type"]);
+
+                        if (files[i].IsReadOnly)
+                        {
+                            Assert.AreEqual("dfr", facts["Perm"]);
+                        }
+                        else
+                        {
+                            Assert.AreEqual("adfrw", facts["Perm"]);
+                        }
+                    }
+                }
+
+                Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("226 "u8));
+            }
+
+            await this.WriteLineAsync("OPTS MLST"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            await this.WriteLineAsync("FEAT"u8.ToArray());
+            {
+                List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)> features = await this.ReadFeaturesAsync();
+                (ReadOnlyMemory<byte> _, ReadOnlyMemory<byte>? mlstFeatParam) = features.Single(f => f.FeatName.Span.SequenceEqual("MLST"u8));
+                Dictionary<string, bool> facts = ParseMLstFeatParams(mlstFeatParam);
+                Assert.DoesNotContain(pair => pair.Value, facts);
+            }
+
+            {
+                using TcpClient dataClient = await this.ConnectWithEpsvAsync();
+                using NetworkStream dataStream = dataClient.GetStream();
+
+                await this.WriteLineAsync("MLSD"u8.ToArray());
+                byte[]? mlsdResponse = await this.ReadLineAsync();
+                Assert.IsTrue(mlsdResponse.AsSpan().StartsWith("125 "u8) || mlsdResponse.AsSpan().StartsWith("150 "u8));
+
+                List<byte[]> listResult = await this.ReadLinesAsync(dataStream);
+                Assert.HasCount(files.Length + 1, listResult);
+                for (int i = 0; i < files.Length; ++i)
+                {
+                    (Dictionary<string, string> facts, string pathName) = ParseMlsXEntry(listResult[i]);
+                    Assert.AreEqual(files[i].Name, pathName);
+                    Assert.IsEmpty(facts); // No facts should be returned
+                }
+
+                Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("226 "u8));
+            }
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        /// <summary>
+        /// Test MLst command on a file and the corresponding OPTS and FEAT command (RFC 3659).
+        /// </summary>
+        /// <returns>The task representing the async operation.</returns>
+        [TestMethod]
+        public async Task MLstTestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IMLstFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            await this.WriteLineAsync("OPTS MLST Size;Type;Perm;Modify;"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            FileSystemEntry file = new() { Name = "图片.jpg", Length = long.MaxValue, LastWriteTime = new DateTime(1000, 1, 1, 0, 0, 0, 0) };
+            fileProvider.Setup(x => x.GetWorkingDirectory()).Returns("/");
+            fileProvider.Setup(x => x.GetItemAsync("/图片.jpg")).Returns(Task.FromResult(file));
+
+            await this.WriteLineAsync("MLst /图片.jpg"u8.ToArray());
+            {
+                Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("250-"u8));
+                byte[]? line = await this.ReadLineAsync();
+                Assert.IsNotNull(line);
+                Assert.IsGreaterThan(0, line.Length);
+                Assert.AreEqual(' ', (char)line[0]);
+                (Dictionary<string, string>? facts, string? pathName) = ParseMlsXEntry(line.AsMemory()[1..]);
+                Assert.AreEqual(file.Length, long.Parse(facts["Size"], CultureInfo.InvariantCulture));
+                Assert.AreEqual("file", facts["Type"]);
+                Assert.AreEqual("adfrw", facts["Perm"]);
+                Assert.AreEqual(file.Name, pathName);
+
+                Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("250 "u8));
+            }
+
+            await this.WriteLineAsync("OPTS MLST"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            await this.WriteLineAsync("MLST /图片.jpg"u8.ToArray());
+            {
+                Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("250-"u8));
+                byte[]? line = await this.ReadLineAsync();
+                Assert.IsNotNull(line);
+                Assert.IsGreaterThan(0, line.Length);
+                Assert.AreEqual(' ', (char)line[0]);
+                (Dictionary<string, string>? facts, string? pathName) = ParseMlsXEntry(line.AsMemory()[1..]);
+                Assert.IsEmpty(facts); // No facts should be returned
+                Assert.AreEqual(file.Name, pathName);
+
+                Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("250 "u8));
+            }
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        /// <summary>
+        /// Tests that the MLST feature line is not returned when not supported.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task MLstFeatLineNotReturnedWhenNotSupportedTestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            await this.WriteLineAsync("FEAT"u8.ToArray());
+            {
+                List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)> features = await this.ReadFeaturesAsync();
+                Assert.DoesNotContain(f => f.FeatName.Span.SequenceEqual("MLST"u8), features);
+            }
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        /// <summary>
+        /// Test MLsD command with non-existent path should return 550 response (RFC 3659 7.2.1).
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task MLsDNonExistentPathReturns550TestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IMLstFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            // Setup GetChildItems to throw FileNoAccessException for non-existent path
+            fileProvider.Setup(x => x.GetChildItems("/nonexistent"))
+                .ThrowsAsync(new FileNoAccessException("Path not found"));
+
+            await this.WriteLineAsync("MLSD /nonexistent"u8.ToArray());
+            byte[]? response = await this.ReadLineAsync();
+            Assert.IsTrue(response.AsSpan().StartsWith("550 "u8));
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        /// <summary>
+        /// Test MLsD command with file (not directory) path should return 501 response (RFC 3659 7.2.1).
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task MLsDFilePathReturns501TestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IMLstFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            // Setup GetChildItems to throw ArgumentException for file path
+            fileProvider.Setup(x => x.GetChildItems("/file.txt"))
+                .ThrowsAsync(new ArgumentException("Path is not a directory"));
+
+            await this.WriteLineAsync("MLSD /file.txt"u8.ToArray());
+            byte[]? response = await this.ReadLineAsync();
+            Assert.IsTrue(response.AsSpan().StartsWith("501 "u8));
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        /// <summary>
+        /// Test MLst command with non-existent path should return 550 response (RFC 3659 7.2.1).
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task MLstNonExistentPathReturns550TestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IMLstFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            // Setup GetItemAsync to throw FileNoAccessException for non-existent path
+            fileProvider.Setup(x => x.GetItemAsync("/nonexistent.txt"))
+                .ThrowsAsync(new FileNoAccessException("File not found"));
+
+            await this.WriteLineAsync("MLST /nonexistent.txt"u8.ToArray());
+            byte[]? response = await this.ReadLineAsync();
+            Assert.IsTrue(response.AsSpan().StartsWith("550 "u8));
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        /// <summary>
+        /// Test MLsD command without authentication should return 530 response (RFC 959 5.4; RFC 3659 7.2.1).
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task MLsDWithoutAuthReturns530TestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IMLstFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("MLSD"u8.ToArray());
+            byte[]? response = await this.ReadLineAsync();
+            Assert.IsTrue(response.AsSpan().StartsWith("530 "u8));
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
+        /// <summary>
+        /// Test MLst command without authentication should return 530 response (RFC 959 5.4; RFC 3659 7.2.1).
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task MLstWithoutAuthReturns530TestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Mock<IMLstFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("MLST /somefile.txt"u8.ToArray());
+            byte[]? response = await this.ReadLineAsync();
+            Assert.IsTrue(response.AsSpan().StartsWith("530 "u8));
 
             this.readPipeWriter.Complete();
             await runTask;
@@ -280,6 +625,56 @@ namespace Zhaobang.FtpServer.Tests.Connections
             }
         }
 
+        private static (Dictionary<string, string> Facts, string PathName) ParseMlsXEntry(ReadOnlyMemory<byte> line)
+        {
+            // RFC 3659
+            int factsEnd = line.Span.IndexOf((byte)' ');
+            string pathName = Encoding.UTF8.GetString(line[(factsEnd + 1)..].Span);
+            line = line[..factsEnd];
+
+            Dictionary<string, string> facts = [];
+            while (line.Span.IndexOf((byte)'=') is int factNameEnd && factNameEnd >= 0)
+            {
+                ReadOnlyMemory<byte> factName = line[..factNameEnd];
+                line = line[(factNameEnd + 1)..];
+                if (!(line.Span.IndexOf((byte)';') is int factValueEnd && factValueEnd >= 0))
+                {
+                    throw new ArgumentException($"Invalid fact. Expect \";\" in line \"{Encoding.UTF8.GetString(line.Span)}\"");
+                }
+
+                ReadOnlyMemory<byte> factValue = line[..factValueEnd];
+                line = line[(factValueEnd + 1)..];
+                facts.Add(Encoding.UTF8.GetString(factName.Span), Encoding.UTF8.GetString(factValue.Span));
+            }
+
+            Assert.AreEqual(0, line.Length);
+
+            return (Facts: facts, PathName: pathName);
+        }
+
+        private static Dictionary<string, bool> ParseMLstFeatParams(ReadOnlyMemory<byte>? mlstFeatParam)
+        {
+            Assert.IsNotNull(mlstFeatParam);
+            ReadOnlySpan<byte> mlstFeatParamSpan = mlstFeatParam.Value.Span;
+            Dictionary<string, bool> facts = [];
+            while (mlstFeatParamSpan.IndexOf((byte)';') is int index && index >= 0)
+            {
+                if (index > 1 && mlstFeatParamSpan[index - 1] == '*')
+                {
+                    facts.Add(Encoding.ASCII.GetString(mlstFeatParamSpan[..(index - 1)]), true);
+                }
+                else
+                {
+                    facts.Add(Encoding.ASCII.GetString(mlstFeatParamSpan[..index]), false);
+                }
+
+                mlstFeatParamSpan = mlstFeatParamSpan[(index + 1)..];
+            }
+
+            Assert.IsTrue(mlstFeatParamSpan.IsEmpty);
+            return facts;
+        }
+
         private async Task<byte[]?> ReadLineAsync()
         {
             if (this.writePipeReader is null)
@@ -347,6 +742,60 @@ namespace Zhaobang.FtpServer.Tests.Connections
             byte[] newLine = "\r\n"u8.ToArray();
             await this.readPipeWriter.WriteAsync(newLine, this.testContext.CancellationToken);
             await this.readPipeWriter.FlushAsync(this.testContext.CancellationToken);
+        }
+
+        private async Task<List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)>> ReadFeaturesAsync()
+        {
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("211-"u8));
+            List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)> features = [];
+            while (true)
+            {
+                // RFC 2389 3.2
+                byte[]? line = await this.ReadLineAsync();
+                Assert.IsNotNull(line);
+                if (line.AsSpan().StartsWith("211 "u8))
+                {
+                    break;
+                }
+                else
+                {
+                    Assert.IsTrue(line.AsSpan().StartsWith(" "u8));
+                    ReadOnlyMemory<byte> fullFeature = line.AsMemory()[1..];
+                    int spaceIndex = fullFeature.Span.IndexOf((byte)' ');
+                    if (spaceIndex < 0)
+                    {
+                        features.Add((fullFeature, null));
+                    }
+                    else
+                    {
+                        features.Add((fullFeature[..spaceIndex], fullFeature[(spaceIndex + 1)..]));
+                    }
+                }
+            }
+
+            return features;
+        }
+
+        private async Task<TcpClient> ConnectWithEpsvAsync()
+        {
+            // RFC 2428
+            await this.WriteLineAsync("EPSV"u8.ToArray());
+            byte[]? epsvResponse = await this.ReadLineAsync();
+            Assert.IsNotNull(epsvResponse);
+
+            ReadOnlySpan<byte> epsvAddress = GetAddressFromEpsv(epsvResponse);
+            int epsvPortNum = GetPortFromEpsvAddress(epsvAddress);
+            TcpClient dataClient = new(this.serverEndPoint.AddressFamily);
+            try
+            {
+                await dataClient.ConnectAsync(this.serverEndPoint.Address, epsvPortNum, this.testContext.CancellationToken);
+                return dataClient;
+            }
+            catch (Exception)
+            {
+                dataClient.Dispose();
+                throw;
+            }
         }
 
         private sealed class MockControlConnectionHost : IControlConnectionHost
