@@ -709,7 +709,17 @@ namespace Zhaobang.FtpServer.Connections
         private async Task CommandPasvAsync()
         {
             var localEP = dataConnection.Listen();
-            var ipBytes = localEP.Address.GetAddressBytes();
+            IPAddress ipv4Address;
+            if (localEP.Address.IsIPv4MappedToIPv6)
+            {
+                ipv4Address = localEP.Address.MapToIPv4();
+            }
+            else
+            {
+                ipv4Address = localEP.Address;
+            }
+
+            byte[] ipBytes = ipv4Address.GetAddressBytes();
             if (ipBytes.Length != 4) throw new Exception();
             var passiveEPString =
                 string.Format(

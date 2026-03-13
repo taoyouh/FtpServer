@@ -557,6 +557,71 @@ namespace Zhaobang.FtpServer.Tests.Connections
             await runTask;
         }
 
+        /// <summary>
+        /// Test PASV command with IPv4 mapped IPv6 address.
+        /// When IDataConnection.Listen() returns IPv4 mapped IPv6 address,
+        /// PASV command should still work correctly.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task PasvWithIPv4MappedToIPv6AddressTestAsync()
+        {
+            var mockDataConnection = new Mock<IDataConnection>();
+            var ipv4MappedIPv6 = IPAddress.Parse("::ffff:127.0.0.1");
+            var ipv4MappedEndpoint = new IPEndPoint(ipv4MappedIPv6, 21234);
+            mockDataConnection.Setup(x => x.Listen()).Returns(ipv4MappedEndpoint);
+
+            Mock<IDataConnectionFactory> mockDataConnectionFactory = new Mock<IDataConnectionFactory>();
+            mockDataConnectionFactory.Setup(x => x.GetDataConnection(It.IsAny<IPAddress>())).Returns(mockDataConnection.Object);
+
+            Mock<IFileProvider> fileProvider = new();
+            var mockHost = new MockControlConnectionHost();
+            mockHost.DataConnector = mockDataConnectionFactory.Object;
+            mockHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            using ControlConnection controlConnection = new(
+                mockHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            await this.WriteLineAsync("PASV"u8.ToArray());
+            byte[]? pasvResponse = await this.ReadLineAsync();
+            Assert.IsNotNull(pasvResponse);
+            Assert.IsTrue(pasvResponse.AsSpan().StartsWith("227 "u8));
+
+            // Parse the PASV response to verify IP address and port format
+            // Format: 227 ... (h1,h2,h3,h4,p1,p2)
+            string responseString = System.Text.Encoding.UTF8.GetString(pasvResponse);
+            int openParen = responseString.IndexOf('(');
+            int closeParen = responseString.IndexOf(')');
+            Assert.IsTrue(openParen >= 0 && closeParen > openParen);
+
+            string[] addressParts = responseString[(openParen + 1)..closeParen].Split(',');
+            Assert.HasCount(6, addressParts);
+
+            // Verify the IP address is 127.0.0.1 (from IPv4 mapped IPv6 ::ffff:127.0.0.1)
+            Assert.AreEqual("127", addressParts[0]);
+            Assert.AreEqual("0", addressParts[1]);
+            Assert.AreEqual("0", addressParts[2]);
+            Assert.AreEqual("1", addressParts[3]);
+
+            // Verify port is in valid range
+            int p1 = int.Parse(addressParts[4], CultureInfo.InvariantCulture);
+            int p2 = int.Parse(addressParts[5], CultureInfo.InvariantCulture);
+            int port = (p1 * 256) + p2;
+            Assert.AreEqual(21234, port);
+
+            this.readPipeWriter.Complete();
+            await runTask;
+        }
+
         private static int GetPortFromEpsvAddress(ReadOnlySpan<byte> epsvAddress)
         {
             byte epsvAddressDelimiter = epsvAddress[0];
@@ -802,7 +867,7 @@ namespace Zhaobang.FtpServer.Tests.Connections
         {
             public FtpTracer Tracer { get; } = new();
 
-            public IDataConnectionFactory DataConnector { get; } = new LocalDataConnectionFactory();
+            public IDataConnectionFactory DataConnector { get; set; } = new LocalDataConnectionFactory();
 
             public IAuthenticator Authenticator { get; } = new AnonymousAuthenticator();
 

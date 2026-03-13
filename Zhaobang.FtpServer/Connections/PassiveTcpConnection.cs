@@ -25,7 +25,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <param name="listenAddress">The address to bind the listener on.</param>
         public PassiveTcpConnection(IPAddress listenAddress)
         {
-            var listenSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            var listenSocket = new Socket(listenAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             listenSocket.Bind(new IPEndPoint(listenAddress, 0));
             listenSocket.Listen(0);
             this.ListenEndPoint = (IPEndPoint)listenSocket.LocalEndPoint;
