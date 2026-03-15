@@ -117,6 +117,7 @@ namespace Zhaobang.FtpServer.Connections
             IEnumerable<FileSystemEntry> entries = await this.fileProvider.GetChildItems(path);
             using (var writer = new StreamWriter(outputStream, new UTF8Encoding(false), -1, true))
             {
+                writer.NewLine = "\r\n";
                 foreach (FileSystemEntry entry in entries)
                 {
                     await writer.WriteLineAsync(FormatEntry(entry));
