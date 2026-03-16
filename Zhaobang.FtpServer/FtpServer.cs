@@ -79,6 +79,12 @@ namespace Zhaobang.FtpServer
         {
             this.listenEndPoint = endPoint ?? throw new ArgumentNullException(nameof(endPoint));
 
+            // Reject IPv4-mapped IPv6 addresses
+            if (this.listenEndPoint.Address.IsIPv4MappedToIPv6)
+            {
+                throw new ArgumentException("IPv4-mapped IPv6 addresses are not supported. Use the IPv4 address instead.", nameof(endPoint));
+            }
+
             this.fileProviderFactory = fileProviderFactory;
             this.dataConnFactory = dataConnFactory;
             this.authenticator = authenticator;
@@ -122,7 +128,7 @@ namespace Zhaobang.FtpServer
                     throw new InvalidOperationException("The server is already running.");
                 }
 
-                this.listenSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                this.listenSocket = new Socket(this.listenEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                 this.listenSocket.Bind(this.listenEndPoint);
                 this.listenSocket.Listen(int.MaxValue);
                 while (!cancellationToken.IsCancellationRequested)
