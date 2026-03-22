@@ -236,7 +236,7 @@ namespace Zhaobang.FtpServer.Connections
         public void Close()
         {
             TcpClient = null;
-            tcpListener.Stop();
+            tcpListener?.Stop();
         }
 
         /// <summary>

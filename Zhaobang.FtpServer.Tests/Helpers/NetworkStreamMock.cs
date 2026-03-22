@@ -4,7 +4,7 @@
 
 using System.IO.Pipelines;
 
-namespace Zhaobang.FtpServer.Tests.Mocks
+namespace Zhaobang.FtpServer.Tests.Helpers
 {
     /// <summary>
     /// Utility to create a mock network stream.

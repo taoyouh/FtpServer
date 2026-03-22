@@ -2,7 +2,7 @@
 // Copyright (c) Zhaoquan Huang. All rights reserved
 // </copyright>
 
-namespace Zhaobang.FtpServer.Tests.Mocks
+namespace Zhaobang.FtpServer.Tests.Helpers
 {
     /// <summary>
     /// A stream to combine a stream for reading and a stream for writing.
