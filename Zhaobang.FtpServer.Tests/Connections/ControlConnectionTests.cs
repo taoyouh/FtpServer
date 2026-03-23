@@ -6,6 +6,7 @@ using System.Buffers;
 using System.Globalization;
 using System.IO.Pipelines;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
 using Moq;
@@ -746,6 +747,52 @@ namespace Zhaobang.FtpServer.Tests.Connections
 
             await this.WriteLineAsync("PASS"u8.ToArray());
             Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            (CombinedStream stream, PipeWriter writer, PipeReader reader) = NetworkStreamMock.Create();
+            fileProvider.Setup(x => x.CreateFileForWriteAsync("图片.jpg")).Returns(Task.FromResult(stream as Stream));
+            {
+                async Task RecieveAsync()
+                {
+                    int i = 0;
+                    var result = await reader.ReadAsync(this.testContext.CancellationToken);
+                    if (i == 100)
+                    {
+                        Assert.IsTrue(result.Buffer.IsEmpty);
+                    }
+                    else
+                    {
+                        SequenceReader<byte> sequenceReader = new(result.Buffer);
+                        while (i < 100 && sequenceReader.TryRead(out byte b))
+                        {
+                            Assert.AreEqual((byte)i, b);
+                            ++i;
+                        }
+
+                        reader.AdvanceTo(sequenceReader.Position);
+                    }
+                }
+
+                Task receiveTask = RecieveAsync();
+                using TcpClient dataClient = await this.ConnectWithEpsvAsync();
+
+                await this.WriteLineAsync("STOR 图片.jpg"u8.ToArray());
+                byte[]? storResponse = await this.ReadLineAsync();
+                Assert.IsTrue(storResponse.AsSpan().StartsWith("125 "u8) || storResponse.AsSpan().StartsWith("150 "u8));
+
+                using SslStream sslDataStream = new(dataClient.GetStream(), false, this.testCertificate.ValidationCallback);
+                await sslDataStream.AuthenticateAsClientAsync(string.Empty);
+                byte[] bytesToUpload = new byte[100];
+                for (int i = 0; i < bytesToUpload.Length; ++i)
+                {
+                    bytesToUpload[i] = (byte)i;
+                }
+
+                await sslDataStream.WriteAsync(bytesToUpload, this.testContext.CancellationToken);
+                await sslDataStream.ShutdownAsync();
+
+                Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("226 "u8));
+                await receiveTask;
+            }
 
             await this.WriteLineAsync("QUIT"u8.ToArray());
             this.readPipeWriter.Complete();

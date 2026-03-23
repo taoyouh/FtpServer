@@ -1,28 +1,24 @@
-﻿// <copyright file="DataConnectionTests.cs" company="Zhaoquan Huang">
+// <copyright file="DataConnectionTests.cs" company="Zhaoquan Huang">
 // Copyright (c) Zhaoquan Huang. All rights reserved
 // </copyright>
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 using Zhaobang.FtpServer.Connections;
 
 namespace Zhaobang.FtpServer.Tests.Connections
 {
     /// <summary>
-    /// Tests for <see cref="LocalDataConnection"/>.
+    /// Tests for <see cref="IDataConnection"/> implementations.
     /// </summary>
-    [TestClass]
-    public class DataConnectionTests
+    /// <typeparam name="T">The type of the data connection to test.</typeparam>
+    public abstract class DataConnectionTests<T>
+        where T : IDataConnection
     {
         private readonly TestContext testContext;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DataConnectionTests"/> class.
+        /// Initializes a new instance of the <see cref="DataConnectionTests{T}"/> class.
         /// </summary>
         /// <param name="testContext">The context of test operation used to cancel the test.</param>
         public DataConnectionTests(TestContext testContext)
@@ -32,14 +28,19 @@ namespace Zhaobang.FtpServer.Tests.Connections
         }
 
         /// <summary>
-        /// When a client connects to the listening port of <see cref="LocalDataConnection"/>, its <see cref="LocalDataConnection.IsOpen"/> should be true.
+        /// Gets the context of test operation used to cancel the test.
+        /// </summary>
+        protected TestContext TestContext => this.testContext;
+
+        /// <summary>
+        /// When a client connects to the listening port of <see cref="IDataConnection"/>, its <see cref="IDataConnection.IsOpen"/> should be true.
         /// </summary>
         /// <returns>The task representing the async operation.</returns>
         [TestMethod]
         public async Task ListenTestAsync()
         {
             var serverIp = IPAddress.IPv6Loopback;
-            LocalDataConnection connection = new(serverIp);
+            T connection = this.CreateDataConnection(serverIp);
             IPEndPoint listenEndPoint = connection.Listen();
 
             using TcpClient tcpClient = new();
@@ -51,14 +52,14 @@ namespace Zhaobang.FtpServer.Tests.Connections
         }
 
         /// <summary>
-        /// <see cref="LocalDataConnection.AcceptAsync"/> should wait until a client connects to the listening end point.
+        /// <see cref="IDataConnection.AcceptAsync"/> should wait until a client connects to the listening end point.
         /// </summary>
         /// <returns>The task representing the async operation.</returns>
         [TestMethod]
         public async Task AcceptAsyncBeforeConnectionTestAsync()
         {
             var serverIp = IPAddress.IPv6Loopback;
-            LocalDataConnection connection = new(serverIp);
+            T connection = this.CreateDataConnection(serverIp);
             IPEndPoint listenEndPoint = connection.Listen();
             Task acceptTask = connection.AcceptAsync();
 
@@ -74,27 +75,27 @@ namespace Zhaobang.FtpServer.Tests.Connections
         }
 
         /// <summary>
-        /// <see cref="LocalDataConnection.AcceptAsync"/> should only be called when it's waiting for a incoming connection.
+        /// <see cref="IDataConnection.AcceptAsync"/> should only be called when it's waiting for a incoming connection.
         /// </summary>
         /// <returns>The task representing the async operation.</returns>
         [TestMethod]
         public async Task AcceptWithoutListenTestAsync()
         {
             var serverIp = IPAddress.IPv6Loopback;
-            LocalDataConnection connection = new(serverIp);
+            T connection = this.CreateDataConnection(serverIp);
 
             await Assert.ThrowsAsync<InvalidOperationException>(connection.AcceptAsync);
         }
 
         /// <summary>
-        /// When calling <see cref="LocalDataConnection.Listen"/>, previous <see cref="LocalDataConnection.AcceptAsync"/> calls should fail, and previous listening port should be closed.
+        /// When calling <see cref="IDataConnection.Listen"/>, previous <see cref="IDataConnection.AcceptAsync"/> calls should fail, and previous listening port should be closed.
         /// </summary>
         /// <returns>The task representing the async operation.</returns>
         [TestMethod]
         public async Task ListenTwiceTestAsync()
         {
             var serverIp = IPAddress.IPv6Loopback;
-            LocalDataConnection connection = new(serverIp);
+            T connection = this.CreateDataConnection(serverIp);
             IPEndPoint endPoint1 = connection.Listen();
             Task acceptTask1 = connection.AcceptAsync();
 
@@ -118,14 +119,14 @@ namespace Zhaobang.FtpServer.Tests.Connections
         }
 
         /// <summary>
-        /// Calling <see cref="LocalDataConnection.Listen"/> should listen for new connection and disconnect existing data connection.
+        /// Calling <see cref="IDataConnection.Listen"/> should listen for new connection and disconnect existing data connection.
         /// </summary>
         /// <returns>The task representing the async operation.</returns>
         [TestMethod]
         public async Task ListenAfterSuccessfulConnectionTestAsync()
         {
             var serverIp = IPAddress.IPv6Loopback;
-            LocalDataConnection connection = new(serverIp);
+            T connection = this.CreateDataConnection(serverIp);
             IPEndPoint endPoint1 = connection.Listen();
 
             using TcpClient client1 = new();
@@ -145,14 +146,14 @@ namespace Zhaobang.FtpServer.Tests.Connections
         }
 
         /// <summary>
-        /// Closing <see cref="LocalDataConnection"/> should close its TCP connection.
+        /// Closing <see cref="IDataConnection"/> should close its TCP connection.
         /// </summary>
         /// <returns>The task representing the async operation.</returns>
         [TestMethod]
         public async Task CloseTestAsync()
         {
             var serverIp = IPAddress.IPv6Loopback;
-            LocalDataConnection connection = new(serverIp);
+            T connection = this.CreateDataConnection(serverIp);
             IPEndPoint listenEndPoint = connection.Listen();
 
             using TcpClient tcpClient = new();
@@ -165,14 +166,14 @@ namespace Zhaobang.FtpServer.Tests.Connections
         }
 
         /// <summary>
-        /// When calling <see cref="LocalDataConnection.ConnectActiveAsync"/>, previous <see cref="LocalDataConnection.AcceptAsync"/> calls should fail, and previous listening port should be closed.
+        /// When calling <see cref="IDataConnection.ConnectActiveAsync"/>, previous <see cref="IDataConnection.AcceptAsync"/> calls should fail, and previous listening port should be closed.
         /// </summary>
         /// <returns>The task representing the async operation.</returns>
         [TestMethod]
         public async Task ConnectAfterListenTestAsync()
         {
             var serverIp = IPAddress.IPv6Loopback;
-            LocalDataConnection connection = new(serverIp);
+            T connection = this.CreateDataConnection(serverIp);
 
             IPEndPoint endPoint1 = connection.Listen();
             Task acceptTask1 = connection.AcceptAsync();
@@ -188,6 +189,13 @@ namespace Zhaobang.FtpServer.Tests.Connections
             await Assert.ThrowsAsync<SocketException>(async () =>
                 await client1.ConnectAsync(endPoint1, this.testContext.CancellationToken));
         }
+
+        /// <summary>
+        /// Creates a new instance of the data connection to test.
+        /// </summary>
+        /// <param name="serverIp">The IP address of the server used in control connection.</param>
+        /// <returns>The new data connection instance.</returns>
+        protected abstract T CreateDataConnection(IPAddress serverIp);
 
         private async Task CheckTcpConnectionClosedAsync(TcpClient client)
         {
@@ -205,7 +213,7 @@ namespace Zhaobang.FtpServer.Tests.Connections
             }
         }
 
-        private async Task WaitUntilOpenAsync(LocalDataConnection connection)
+        private async Task WaitUntilOpenAsync(T connection)
         {
             while (!connection.IsOpen)
             {
