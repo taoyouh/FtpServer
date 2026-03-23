@@ -1,4 +1,4 @@
-﻿// <copyright file="LocalDataConnectionTests.cs" company="Zhaoquan Huang">
+﻿// <copyright file="DataConnectionTests.cs" company="Zhaoquan Huang">
 // Copyright (c) Zhaoquan Huang. All rights reserved
 // </copyright>
 
@@ -17,15 +17,15 @@ namespace Zhaobang.FtpServer.Tests.Connections
     /// Tests for <see cref="LocalDataConnection"/>.
     /// </summary>
     [TestClass]
-    public class LocalDataConnectionTests
+    public class DataConnectionTests
     {
         private readonly TestContext testContext;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="LocalDataConnectionTests"/> class.
+        /// Initializes a new instance of the <see cref="DataConnectionTests"/> class.
         /// </summary>
         /// <param name="testContext">The context of test operation used to cancel the test.</param>
-        public LocalDataConnectionTests(TestContext testContext)
+        public DataConnectionTests(TestContext testContext)
         {
             ArgumentNullException.ThrowIfNull(testContext);
             this.testContext = testContext;
