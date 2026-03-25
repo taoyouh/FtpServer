@@ -6,13 +6,14 @@ using System.Buffers;
 using System.Globalization;
 using System.IO.Pipelines;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
 using Moq;
 using Zhaobang.FtpServer.Authenticate;
 using Zhaobang.FtpServer.Connections;
 using Zhaobang.FtpServer.File;
-using Zhaobang.FtpServer.Tests.Mocks;
+using Zhaobang.FtpServer.Tests.Helpers;
 using Zhaobang.FtpServer.Trace;
 
 namespace Zhaobang.FtpServer.Tests.Connections
@@ -27,9 +28,11 @@ namespace Zhaobang.FtpServer.Tests.Connections
         private readonly MockControlConnectionHost mockControlConnectionHost = new();
         private readonly IPEndPoint serverEndPoint = new(IPAddress.IPv6Loopback, 56788);
         private readonly IPEndPoint clientEndPoint = new(IPAddress.IPv6Loopback, 56789);
-        private readonly PipeWriter readPipeWriter;
-        private readonly PipeReader writePipeReader;
         private readonly CombinedStream stream;
+        private readonly TestCertificate testCertificate = new();
+
+        private PipeWriter readPipeWriter;
+        private PipeReader writePipeReader;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ControlConnectionTests"/> class.
@@ -622,6 +625,292 @@ namespace Zhaobang.FtpServer.Tests.Connections
             await runTask;
         }
 
+        /// <summary>
+        /// Tests that AUTH command without SSL factory returns 502 (Command not implemented). See RFC 2228 section 3.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task AuthWithoutSslFactoryTestAsync()
+        {
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("AUTH TLS"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("502 "u8));
+
+            await this.WriteLineAsync("QUIT"u8.ToArray());
+            this.readPipeWriter.Complete();
+
+            Assert.IsNull(await this.ReadLineAsync());
+            await runTask;
+        }
+
+        /// <summary>
+        /// Tests that AUTH command with invalid parameter returns 504 (Command not implemented for that parameter).
+        /// See RFC 2228 section 3.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task AuthWithInvalidParameterTestAsync()
+        {
+            this.mockControlConnectionHost.
+                ControlConnectionSslFactory = new ControlConnectionSslFactory(this.testCertificate.Certificate);
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("AUTH INVALID"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("504 "u8));
+
+            await this.WriteLineAsync("QUIT"u8.ToArray());
+            this.readPipeWriter.Complete();
+
+            Assert.IsNull(await this.ReadLineAsync());
+            await runTask;
+        }
+
+        /// <summary>
+        /// Tests that control connection advertise supported commands as RFC 4217 section 6 in response to FEAT command.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task FeatWithTlsTestAsync()
+        {
+            this.mockControlConnectionHost.ControlConnectionSslFactory = new ControlConnectionSslFactory(this.testCertificate.Certificate);
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("FEAT"u8.ToArray());
+            {
+                List<(ReadOnlyMemory<byte> FeatName, ReadOnlyMemory<byte>? FeatParam)> features = await this.ReadFeaturesAsync();
+                (ReadOnlyMemory<byte> featName, ReadOnlyMemory<byte>? featParam) = features.Single(f => f.FeatName.Span.SequenceEqual("AUTH"u8));
+                Assert.IsNotNull(featParam);
+                Assert.IsTrue(featParam.Value.Span.SequenceEqual("TLS"u8));
+                Assert.Contains(f => f.FeatName.Span.SequenceEqual("PBSZ"u8), features);
+                Assert.Contains(f => f.FeatName.Span.SequenceEqual("PROT"u8), features);
+            }
+
+            await this.WriteLineAsync("QUIT"u8.ToArray());
+            this.readPipeWriter.Complete();
+
+            Assert.IsNull(await this.ReadLineAsync());
+            await runTask;
+        }
+
+        /// <summary>
+        /// Tests that AUTH TLS command upgrades the connection as RFC 4217 12.1.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task AuthTlsUpgradeConnectionTestAsync()
+        {
+            this.mockControlConnectionHost.ControlConnectionSslFactory = new ControlConnectionSslFactory(this.testCertificate.Certificate);
+            this.mockControlConnectionHost.DataConnector = new SslLocalDataConnectionFactory(this.testCertificate.Certificate);
+            using ControlConnection controlConnection = new(
+                this.mockControlConnectionHost,
+                this.stream,
+                this.clientEndPoint,
+                this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("AUTH TLS"u8.ToArray());
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("234 "u8));
+
+            await using SslDuplexPipe sslWrapper = await SslAuthenticator.AuthenticateAsClientAsync(
+                this.writePipeReader, this.readPipeWriter, this.testCertificate.ValidationCallback);
+            this.writePipeReader = sslWrapper.Input;
+            this.readPipeWriter = sslWrapper.Output;
+
+            await this.WriteLineAsync("PBSZ 0"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            await this.WriteLineAsync("PROT P"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            Mock<IFileProvider> fileProvider = new();
+            this.mockControlConnectionHost.FileManager.FileProviders["anonymous"] = fileProvider.Object;
+
+            await this.WriteLineAsync("USER anonymous"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("331 "u8));
+
+            await this.WriteLineAsync("PASS"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("230 "u8));
+
+            (CombinedStream stream, PipeWriter writer, PipeReader reader) = NetworkStreamMock.Create();
+            fileProvider.Setup(x => x.CreateFileForWriteAsync("图片.jpg")).Returns(Task.FromResult(stream as Stream));
+            {
+                async Task RecieveAsync()
+                {
+                    int i = 0;
+                    var result = await reader.ReadAsync(this.testContext.CancellationToken);
+                    if (i == 100)
+                    {
+                        Assert.IsTrue(result.Buffer.IsEmpty);
+                    }
+                    else
+                    {
+                        SequenceReader<byte> sequenceReader = new(result.Buffer);
+                        while (i < 100 && sequenceReader.TryRead(out byte b))
+                        {
+                            Assert.AreEqual((byte)i, b);
+                            ++i;
+                        }
+
+                        reader.AdvanceTo(sequenceReader.Position);
+                    }
+                }
+
+                Task receiveTask = RecieveAsync();
+                using TcpClient dataClient = await this.ConnectWithEpsvAsync();
+
+                await this.WriteLineAsync("STOR 图片.jpg"u8.ToArray());
+                byte[]? storResponse = await this.ReadLineAsync();
+                Assert.IsTrue(storResponse.AsSpan().StartsWith("125 "u8) || storResponse.AsSpan().StartsWith("150 "u8));
+
+                using SslStream sslDataStream = new(dataClient.GetStream(), false, this.testCertificate.ValidationCallback);
+                await sslDataStream.AuthenticateAsClientAsync(string.Empty);
+                byte[] bytesToUpload = new byte[100];
+                for (int i = 0; i < bytesToUpload.Length; ++i)
+                {
+                    bytesToUpload[i] = (byte)i;
+                }
+
+                await sslDataStream.WriteAsync(bytesToUpload, this.testContext.CancellationToken);
+                await sslDataStream.ShutdownAsync();
+
+                Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("226 "u8));
+                await receiveTask;
+            }
+
+            await this.WriteLineAsync("QUIT"u8.ToArray());
+            this.readPipeWriter.Complete();
+
+            Assert.IsNull(await this.ReadLineAsync());
+            await runTask;
+        }
+
+        /// <summary>
+        /// Tests that PROT C command sets clear data connection.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task ProtCSetsClearDataConnectionTestAsync()
+        {
+            this.mockControlConnectionHost.ControlConnectionSslFactory = new ControlConnectionSslFactory(this.testCertificate.Certificate);
+            using ControlConnection controlConnection = new(this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("PBSZ 0"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            await this.WriteLineAsync("PROT C"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            await this.WriteLineAsync("QUIT"u8.ToArray());
+            this.readPipeWriter.Complete();
+
+            Assert.IsNull(await this.ReadLineAsync());
+            await runTask;
+        }
+
+        /// <summary>
+        /// Tests that unsupported protection level in PROT command fails and returns 536 as in RFC 2228 section 3.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task UnsupportedProtectionLevelReturns536TestAsync()
+        {
+            this.mockControlConnectionHost.ControlConnectionSslFactory = new ControlConnectionSslFactory(this.testCertificate.Certificate);
+            this.mockControlConnectionHost.DataConnector = new SslLocalDataConnectionFactory(this.testCertificate.Certificate);
+            using ControlConnection controlConnection = new(this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("PBSZ 0"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            // Protection level S is not supported by TLS
+            await this.WriteLineAsync("PROT S"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("536 "u8));
+
+            // Protection level E is not supported by TLS
+            await this.WriteLineAsync("PROT E"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("536 "u8));
+
+            await this.WriteLineAsync("QUIT"u8.ToArray());
+            this.readPipeWriter.Complete();
+
+            Assert.IsNull(await this.ReadLineAsync());
+            await runTask;
+        }
+
+        /// <summary>
+        /// Tests that PROT P command without SSL data connection returns 504.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task ProtPWithoutSslDataConnectionReturns504TestAsync()
+        {
+            this.mockControlConnectionHost.ControlConnectionSslFactory = new ControlConnectionSslFactory(this.testCertificate.Certificate);
+            using ControlConnection controlConnection = new(this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("PBSZ 0"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            await this.WriteLineAsync("PROT P"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("504 "u8));
+
+            await this.WriteLineAsync("QUIT"u8.ToArray());
+            this.readPipeWriter.Complete();
+
+            Assert.IsNull(await this.ReadLineAsync());
+            await runTask;
+        }
+
+        /// <summary>
+        /// Tests that PROT with invalid parameter returns 504.
+        /// </summary>
+        /// <returns>A task representing the asynchronous test operation.</returns>
+        [TestMethod]
+        public async Task ProtInvalidParameterReturns504TestAsync()
+        {
+            this.mockControlConnectionHost.ControlConnectionSslFactory = new ControlConnectionSslFactory(this.testCertificate.Certificate);
+            using ControlConnection controlConnection = new(this.mockControlConnectionHost, this.stream, this.clientEndPoint, this.serverEndPoint);
+            Task runTask = controlConnection.RunAsync(this.testContext.CancellationToken);
+
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("220 "u8));
+
+            await this.WriteLineAsync("PBSZ 0"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("200 "u8));
+
+            await this.WriteLineAsync("PROT X"u8.ToArray());
+            Assert.IsTrue((await this.ReadLineAsync()).AsSpan().StartsWith("504 "u8));
+
+            await this.WriteLineAsync("QUIT"u8.ToArray());
+            this.readPipeWriter.Complete();
+
+            Assert.IsNull(await this.ReadLineAsync());
+            await runTask;
+        }
+
         private static int GetPortFromEpsvAddress(ReadOnlySpan<byte> epsvAddress)
         {
             byte epsvAddressDelimiter = epsvAddress[0];
@@ -875,7 +1164,7 @@ namespace Zhaobang.FtpServer.Tests.Connections
 
             IFileProviderFactory IControlConnectionHost.FileManager => this.FileManager;
 
-            public IControlConnectionSslFactory? ControlConnectionSslFactory => null;
+            public IControlConnectionSslFactory? ControlConnectionSslFactory { get; set; }
         }
 
         private sealed class MockFileProviderFactory : IFileProviderFactory

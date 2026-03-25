@@ -19,6 +19,7 @@ namespace Zhaobang.FtpServer.Connections
     public class LocalDataConnection : IDisposable, IDataConnection
     {
         private readonly IPAddress listeningIP;
+        private bool disposed = false;
 
         [Obsolete("Use property instead.")]
         private ITcpConnection tcpConnection;
@@ -72,12 +73,20 @@ namespace Zhaobang.FtpServer.Connections
             get => new int[] { 1, 2 };
         }
 
-        private ITcpConnection TcpConnection
+        /// <summary>
+        /// Gets the TCP connection.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">The instance is already disposed.</exception>
+        private protected ITcpConnection TcpConnection
         {
 #pragma warning disable CS0618
             get => this.tcpConnection;
-            set
+            private set
             {
+                if (value != null)
+                {
+                    this.ThrowIfDisposed();
+                }
                 if (this.tcpConnection != value)
                 {
                     if (this.tcpConnection != null)
@@ -98,8 +107,11 @@ namespace Zhaobang.FtpServer.Connections
         /// <param name="remotePort">The port to connect to.</param>
         /// <param name="protocal">Protocal ID defined in RFC 2428.</param>
         /// <returns>The task to await.</returns>
+        /// <exception cref="ObjectDisposedException">The instance is already disposed.</exception>
+        /// <exception cref="NotSupportedException">The <paramref name="protocal"/> value is not supported.</exception>
         public async Task ConnectActiveAsync(IPAddress remoteIP, int remotePort, int protocal)
         {
+            this.ThrowIfDisposed();
             AddressFamily addressFamily;
             switch (protocal)
             {
@@ -122,8 +134,10 @@ namespace Zhaobang.FtpServer.Connections
         /// Listens for FTP passive connection and returns the listening end point.
         /// </summary>
         /// <returns>The end point listening at.</returns>
+        /// <exception cref="ObjectDisposedException">The instance is already disposed.</exception>
         public IPEndPoint Listen()
         {
+            this.ThrowIfDisposed();
             try
             {
                 // Open new connection before stopping pervious listener.
@@ -143,8 +157,11 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         /// <param name="protocal">The protocal ID to use. Defined in RFC 2824.</param>
         /// <returns>The port listening at.</returns>
+        /// <exception cref="ObjectDisposedException">The instance is already disposed.</exception>
+        /// <exception cref="NotSupportedException">The <paramref name="protocal"/> value is not supported.</exception>
         public int ExtendedListen(int protocal)
         {
+            this.ThrowIfDisposed();
             if (SupportedPassiveProtocal.Contains(protocal))
                 return Listen().Port;
             else
@@ -157,8 +174,10 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The task to await.</returns>
         /// <exception cref="InvalidOperationException">Not listening for incoming connection.</exception>
         /// <exception cref="OperationCanceledException">The current listener is closed before any incoming connection.</exception>
+        /// <exception cref="ObjectDisposedException">The instance is already disposed.</exception>
         public async Task AcceptAsync()
         {
+            this.ThrowIfDisposed();
             if (this.TcpConnection == null)
             {
                 throw new InvalidOperationException("Not listening for incoming connection.");
@@ -173,8 +192,8 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The task to await.</returns>
         public Task DisconnectAsync()
         {
-            TcpConnection = null;
-            return Task.CompletedTask;
+            this.ThrowIfDisposed();
+            return this.DisconnectCoreAsync();
         }
 
         /// <summary>
@@ -184,7 +203,7 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The task to await.</returns>
         public async Task SendAsync(Stream streamToRead)
         {
-            NetworkStream stream = this.TcpConnection.Stream;
+            Stream stream = this.GetStream();
             await streamToRead.CopyToAsync(stream);
             await stream.FlushAsync();
         }
@@ -196,16 +215,16 @@ namespace Zhaobang.FtpServer.Connections
         /// <returns>The task to await.</returns>
         public async Task RecieveAsync(Stream streamToWrite)
         {
-            NetworkStream stream = this.TcpConnection.Stream;
+            Stream stream = this.GetStream();
             await stream.CopyToAsync(streamToWrite);
         }
 
         /// <summary>
-        /// Close the connection and listener.
+        /// Close the connection and listener. Same as <see cref="Dispose()"/>.
         /// </summary>
         public void Close()
         {
-            TcpConnection = null;
+            Dispose();
         }
 
         /// <summary>
@@ -213,7 +232,52 @@ namespace Zhaobang.FtpServer.Connections
         /// </summary>
         public void Dispose()
         {
-            Close();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Dispose of the connection and listener.
+        /// </summary>
+        /// <param name="disposing">True if called from <see cref="Dispose()"/>.</param>
+        public virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                this.TcpConnection = null;
+                this.disposed = true;
+            }
+        }
+
+        /// <summary>
+        /// Gets the stream used for data transfer.
+        /// </summary>
+        /// <returns>The stream used for data transfer.</returns>
+        private protected virtual Stream GetStream()
+        {
+            return this.TcpConnection.Stream;
+        }
+
+        /// <summary>
+        /// The implementation of <see cref="DisconnectAsync()"/>.
+        /// </summary>
+        /// <returns>The task to await.</returns>
+        private protected virtual Task DisconnectCoreAsync()
+        {
+            this.TcpConnection = null;
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if the instance is already disposed.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Thrown if the instance is already disposed.</exception>
+        private protected void ThrowIfDisposed()
+        {
+            if (this.disposed)
+            {
+                throw new ObjectDisposedException(nameof(LocalDataConnection));
+            }
         }
     }
 }

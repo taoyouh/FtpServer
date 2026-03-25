@@ -149,6 +149,7 @@ namespace Zhaobang.FtpServer.Connections
             FileActionPendingInfo = 350,
             NotSupportedProtocal = 522,
             ProceedWithNegotiation = 234,
+            UnsupportedProtectionLevel = 536,
         }
 
         /// <summary>
@@ -302,6 +303,12 @@ namespace Zhaobang.FtpServer.Connections
                         string featLine = this.mLstCommandHandler.GetFeatLine();
                         features.Add(featLine);
                     }
+                    if (this.host.ControlConnectionSslFactory != null)
+                    {
+                        features.Add("AUTH TLS");
+                        features.Add("PBSZ");
+                        features.Add("PROT");
+                    }
                     await ReplyMultilineAsync(FtpReplyCode.SystemStatus, $"Supports:\n{string.Join("\n", features)}");
                     return;
                 case "OPTS":
@@ -434,6 +441,9 @@ namespace Zhaobang.FtpServer.Connections
                 case "AUTH":
                     await CommandAuthAsync(parameter);
                     return;
+                case "PBSZ":
+                    await this.CommandPbszAsync(parameter);
+                    return;
                 case "PROT":
                     await CommandProtAsync(parameter);
                     return;
@@ -449,13 +459,37 @@ namespace Zhaobang.FtpServer.Connections
 
         private async Task CommandAuthAsync(string parameter)
         {
-            if ((parameter != "TLS" && parameter != "SSL") || host.ControlConnectionSslFactory == null)
+            if (this.host.ControlConnectionSslFactory == null)
             {
-                await ReplyAsync(FtpReplyCode.NotImplemented, "Not supported");
+                await this.ReplyAsync(FtpReplyCode.NotImplemented, "Security extensions are not implemented.");
+                return;
+            }
+            if (parameter != "TLS" && parameter != "SSL")
+            {
+                await this.ReplyAsync(FtpReplyCode.ParameterNotImplemented, "The requested security mechanism is not supported.");
                 return;
             }
             await ReplyAsync(FtpReplyCode.ProceedWithNegotiation, "Authenticating");
             stream = await host.ControlConnectionSslFactory.UpgradeAsync(stream);
+        }
+
+        private async Task CommandPbszAsync(string parameter)
+        {
+            if (this.host.ControlConnectionSslFactory != null)
+            {
+                if (parameter == "0")
+                {
+                    await this.ReplyAsync(FtpReplyCode.CommandOkay, "PBSZ set to 0.");
+                }
+                else
+                {
+                    await this.ReplyAsync(FtpReplyCode.ParameterNotImplemented, "Only PBSZ 0 is supported.");
+                }
+            }
+            else
+            {
+                await this.ReplyAsync(FtpReplyCode.NotImplemented, "Security extensions are not implemented.");
+            }
         }
 
         private async Task CommandProtAsync(string parameter)
@@ -467,6 +501,8 @@ namespace Zhaobang.FtpServer.Connections
                     break;
                 case "S":
                 case "E":
+                    await ReplyAsync(FtpReplyCode.UnsupportedProtectionLevel, "Protection level not supported");
+                    return;
                 case "P":
                     if (!(dataConnection is ISslDataConnection))
                     {
