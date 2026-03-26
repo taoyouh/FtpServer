@@ -13,6 +13,9 @@ namespace Zhaobang.FtpServer.File
     /// <summary>
     /// The interface of file provider for single user.
     /// </summary>
+    /// <remarks>
+    /// Implementations should also implement <see cref="IMLstFileProvider"/> to support machine-friendly file listing commands MLst and MLsD.
+    /// </remarks>
     public interface IFileProvider
     {
         /// <summary>

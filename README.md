@@ -73,6 +73,9 @@ var server = new FtpServer(ep, fileProviderFactory, dataConnectionFactory, authe
 
 The .NET Standard 1.4 version requires your own implementation of those classes. You can refer to the source code for a sample implementation.
 
+### MLst and MLsD commands (since version 2.2.0)
+MLst and MLsD provides machine-friendly file listing interface. Since version 2.2.0, the server supports them as long as the `IFileProvider` returned by the factory implements `IMLstFileProvider`. The default `SimpleFileProvider` implements `IMLstFileProvider`.
+
 ## Zhaobang.FtpServer.Cli
 The server is a simple FTP server that utilizes the library.
 
