@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFrameworks>netstandard1.4;netstandard2.1</TargetFrameworks>
     <PackageId>Zhaobang.FtpServer</PackageId>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Authors>Zhaoquan Huang</Authors>
     <Product>FTP Server Library</Product>
     <Description>A package for hosting an FTP server, with authenticating and file managing customizable. Go to project site for usage example or executable version.</Description>
