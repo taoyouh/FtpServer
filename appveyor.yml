@@ -4,6 +4,7 @@ pull_requests:
 branches:
   only:
   - master
+  - /release-.+/
 environment:
   matrix:
   - job_name: Linux test
@@ -35,8 +36,6 @@ for:
       secure: tRrj53sW6hpLkOYP9U4PJU9J/EQ2OmNCWrWgZhZ/eF6+DMoY+Ed/GUhG5P8lr8rV
     skip_symbols: true
     artifact: /.*(Zhaobang\.FtpServer\.).*nupkg/
-    on:
-      branch: master
 - matrix:
     only:
     - job_name: Linux test
